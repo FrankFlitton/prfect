@@ -7,7 +7,6 @@
   "license": "MIT",
   "module": "index.ts",
   "main": "dist/index.js",
-  "types": "dist/index.d.ts",
   "scripts": {
     "build": "bun build index.ts --outdir dist --target node --emitDeclarationOnly",
     "test": "bun test"
