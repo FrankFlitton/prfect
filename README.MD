@@ -346,11 +346,6 @@ For detailed logging:
 # Node.js version
 DEBUG=prfect* prfect
 
-# Python version
-python3 prfect.py --verbose
-
-# Bash version
-bash -x prfect.sh
 ```
 
 ## 📝 License
