@@ -2,10 +2,28 @@
   "name": "prfect",
   "module": "index.ts",
   "type": "module",
+  "author": "https://github.com/@frankflitton",
+  "license": "MIT",
+  "scripts": {
+    "build": "bun build index.ts --outdir dist --target node",
+    "test": "bun test"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },
   "peerDependencies": {
     "typescript": "^5"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/frankflitton/prfect.git"
+  },
+  "bugs": {
+    "url": "https://github.com/frankflitton/prfect/issues"
+  },
+  "homepage": "https://github.com/frankflitton/prfect#readme",
+  "dependencies": {
+    "chalk": "^5.4.1",
+    "commander": "^14.0.0"
   }
 }
