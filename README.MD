@@ -26,7 +26,7 @@ Prfect is a powerful tool that analyzes your git commits and generates professio
 ```bash
 curl -fsSL https://ollama.ai/install.sh | sh
 ollama serve
-ollama pull deepseek-coder:latest
+ollama pull qwen3:latest
 ```
 
 2. **Ensure you're in a git repository**
@@ -88,7 +88,7 @@ const generator = new PRGenerator();
 const prMessage = await generator.run({
   source: "feature/new-feature",
   target: "main",
-  model: "deepseek-coder:latest",
+  model: "qwen3:latest",
   save: true,
   interactive: false,
   noEmojis: true,
@@ -150,7 +150,7 @@ password hashing, and role-based access control to improve application security.
 
 ```bash
 export OLLAMA_HOST=http://localhost:11434
-export PRFECT_MODEL=deepseek-coder:latest
+export PRFECT_MODEL=qwen3:latest
 export PRFECT_DEFAULT_TARGET=main
 ```
 
@@ -194,11 +194,16 @@ npm start
 
 Prfect works with any Ollama-compatible model:
 
-- **deepseek-coder:latest** (Recommended for code)
-- **llama2** (General purpose)
-- **codellama** (Code-focused)
-- **mistral** (Fast and efficient)
-- **mixtral** (Advanced reasoning)
+- **qwen3:latest** (Default)
+- **qwen3:4b**
+- **gemma3:latest**
+- **deepseek-coder:latest**
+- **llama3:latest**
+- **codellama:latest**
+- **mistral**
+- **mixtral**
+
+For a complete list visit [Ollama's model hub](https://ollama.com/search) and install them with the Ollama CLI.
 
 Install models with:
 
@@ -240,7 +245,7 @@ jobs:
         run: |
           curl -fsSL https://ollama.ai/install.sh | sh
           ollama serve &
-          ollama pull deepseek-coder:latest
+          ollama pull qwen3:latest
       - name: Generate PR Description
         run: npx prfect --no-interactive --save
 ```
@@ -253,7 +258,7 @@ generate-pr:
   script:
     - curl -fsSL https://ollama.ai/install.sh | sh
     - ollama serve &
-    - ollama pull deepseek-coder:latest
+    - ollama pull qwen3:latest
     - npx prfect --no-interactive
 ```
 
@@ -325,8 +330,8 @@ ollama serve
 # List available models
 ollama list
 
-# Install DeepSeek model
-ollama pull deepseek-coder:latest
+# Install default model
+ollama pull qwen3:latest
 ```
 
 **"Could not detect default branch"**

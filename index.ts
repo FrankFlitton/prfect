@@ -375,7 +375,7 @@ Keep the tone professional but concise. Focus on the business value and technica
     const {
       source: sourceBranch,
       target: targetBranch,
-      model = "deepseek-coder:latest",
+      model = "qwen3:latest",
       save = false,
       interactive = true,
       noEmojis = false,
@@ -485,7 +485,7 @@ async function main() {
       "-t, --target <branch>",
       "Target branch (default: auto-detect main/master)"
     )
-    .option("-m, --model <model>", "Ollama model name", "deepseek-coder:latest")
+    .option("-m, --model <model>", "Ollama model name", "qwen3:latest")
     .option("--ollama-host <url>", "Ollama host URL", "http://localhost:11434")
     .option("--save", "Save PR message to file")
     .option("--no-interactive", "Disable interactive prompts")
