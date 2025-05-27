@@ -366,12 +366,4 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 📞 Support
 
-- **Issues**: [GitHub Issues](https://github.com/user/prfect/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/user/prfect/discussions)
-- **Documentation**: [Wiki](https://github.com/user/prfect/wiki)
-
----
-
-**Made with ❤️ for developers who want perfect PR descriptions**
-
-_Stop writing boring PR descriptions. Let AI do it for you!_
+For support, please open a new issue on the [GitHub Issues](https://github.com/frankflitton/prfect/issues) page.
