@@ -73,6 +73,9 @@ prfect --save
 
 # Custom Ollama host
 prfect --ollama-host http://192.168.1.100:11434
+
+# Generate without emojis
+prfect --no-emojis
 ```
 
 ### Programmatic Usage (Node.js/TypeScript)
@@ -88,6 +91,7 @@ const prMessage = await generator.run({
   model: "deepseek-coder:latest",
   save: true,
   interactive: false,
+  noEmojis: true,
 });
 
 console.log(prMessage);
@@ -99,7 +103,8 @@ console.log(prMessage);
 {
   "scripts": {
     "pr": "prfect",
-    "pr:save": "prfect --save --no-interactive"
+    "pr:save": "prfect --save --no-interactive",
+    "pr:clean": "prfect --no-emojis --save"
   }
 }
 ```
