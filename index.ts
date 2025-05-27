@@ -250,7 +250,8 @@ class PRGenerator {
     commitInfo: CommitInfo,
     model: string,
     sourceBranch: string,
-    targetBranch: string
+    targetBranch: string,
+    noEmojis = false
   ): Promise<string> {
     this.log.info(`Generating PR message using model: ${model}`);
 
@@ -297,7 +298,7 @@ What this PR does and why it's needed. Anything new or changed should be explain
 ## Testing
 [Include if applicable, describe how the changes were tested, any new tests added, etc.]
 
-Keep the tone professional but concise. Focus on the business value and technical changes. Maximum 1000 words total. Do not use placeholder text like "[Title]" - write the actual content.`;
+Keep the tone professional but concise. Focus on the business value and technical changes. Maximum 1000 words total. Do not use placeholder text like "[Title]" - write the actual content.${noEmojis ? ' Do not use any emojis in the response.' : ''}`;
 
     try {
       const response = await fetch(`${this.ollamaHost}/api/generate`, {
@@ -368,6 +369,7 @@ Keep the tone professional but concise. Focus on the business value and technica
       model?: string;
       save?: boolean;
       interactive?: boolean;
+      noEmojis?: boolean;
     } = {}
   ): Promise<string> {
     const {

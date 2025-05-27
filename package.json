@@ -1,11 +1,15 @@
 {
   "name": "prfect",
-  "module": "index.ts",
+  "description": "Prfect is a powerful tool that analyzes your git commits and generates professional pull request descriptions using local AI models via Ollama. No more struggling with blank PR templates or forgetting what you changed!",
   "type": "module",
+  "version": "1.0.0",
   "author": "https://github.com/@frankflitton",
   "license": "MIT",
+  "module": "index.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
-    "build": "bun build index.ts --outdir dist --target node",
+    "build": "bun build index.ts --outdir dist --target node --emitDeclarationOnly",
     "test": "bun test"
   },
   "devDependencies": {
