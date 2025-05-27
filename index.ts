@@ -251,7 +251,8 @@ class PRGenerator {
     model: string,
     sourceBranch: string,
     targetBranch: string,
-    noEmojis = false
+    noEmojis = false,
+    showThinking = false
   ): Promise<string> {
     this.log.info(`Generating PR message using model: ${model}`);
 
@@ -298,7 +299,9 @@ What this PR does and why it's needed. Anything new or changed should be explain
 ## Testing
 [Include if applicable, describe how the changes were tested, any new tests added, etc.]
 
-Keep the tone professional but concise. Focus on the business value and technical changes. Maximum 1000 words total. Do not use placeholder text like "[Title]" - write the actual content.${noEmojis ? ' Do not use any emojis in the response.' : ''}`;
+Keep the tone professional but concise. Focus on the business value and technical changes. Maximum 1000 words total. Do not use placeholder text like "[Title]" - write the actual content.${
+      noEmojis ? " Do not use any emojis in the response." : ""
+    }`;
 
     try {
       const response = await fetch(`${this.ollamaHost}/api/generate`, {
@@ -321,7 +324,16 @@ Keep the tone professional but concise. Focus on the business value and technica
 
       const result = (await response.json()) as OllamaResponse;
       if (result.response) {
-        return result.response;
+        let processedResponse = result.response;
+
+        // Strip thinking tags unless showThinking is enabled
+        if (!showThinking) {
+          processedResponse = processedResponse
+            .replace(/<think>.*?<\/think>/gis, "")
+            .trim();
+        }
+
+        return processedResponse;
       } else {
         throw new Error("No response field in Ollama output");
       }
@@ -370,6 +382,7 @@ Keep the tone professional but concise. Focus on the business value and technica
       save?: boolean;
       interactive?: boolean;
       noEmojis?: boolean;
+      showThinking?: boolean;
     } = {}
   ): Promise<string> {
     const {
@@ -379,6 +392,7 @@ Keep the tone professional but concise. Focus on the business value and technica
       save = false,
       interactive = true,
       noEmojis = false,
+      showThinking = false,
     } = options;
 
     // Check if in git repo
@@ -444,7 +458,8 @@ Keep the tone professional but concise. Focus on the business value and technica
       model,
       finalSourceBranch,
       finalTargetBranch,
-      noEmojis
+      noEmojis,
+      showThinking
     );
 
     if (!prMessage) {
@@ -490,6 +505,10 @@ async function main() {
     .option("--save", "Save PR message to file")
     .option("--no-interactive", "Disable interactive prompts")
     .option("--no-emojis", "Generate PR message without emojis")
+    .option(
+      "--show-thinking",
+      "Show AI thinking process (useful for debugging)"
+    )
     .helpOption("-h, --help", "Display help for command");
 
   program.parse();
@@ -505,6 +524,7 @@ async function main() {
       save: options.save,
       interactive: options.interactive,
       noEmojis: options.noEmojis,
+      showThinking: options.showThinking,
     });
   } catch (error: any) {
     console.error(chalk.red("[ERROR]"), error.message);

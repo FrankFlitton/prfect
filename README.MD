@@ -76,6 +76,9 @@ prfect --ollama-host http://192.168.1.100:11434
 
 # Generate without emojis
 prfect --no-emojis
+
+# Show AI thinking process (useful for debugging)
+prfect --show-thinking
 ```
 
 ### Programmatic Usage (Node.js/TypeScript)
@@ -92,6 +95,7 @@ const prMessage = await generator.run({
   save: true,
   interactive: false,
   noEmojis: true,
+  showThinking: false,
 });
 
 console.log(prMessage);
@@ -104,7 +108,8 @@ console.log(prMessage);
   "scripts": {
     "pr": "prfect",
     "pr:save": "prfect --save --no-interactive",
-    "pr:clean": "prfect --no-emojis --save"
+    "pr:clean": "prfect --no-emojis --save",
+    "pr:debug": "prfect --show-thinking"
   }
 }
 ```
