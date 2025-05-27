@@ -378,6 +378,7 @@ Keep the tone professional but concise. Focus on the business value and technica
       model = "deepseek-coder:latest",
       save = false,
       interactive = true,
+      noEmojis = false,
     } = options;
 
     // Check if in git repo
@@ -442,7 +443,8 @@ Keep the tone professional but concise. Focus on the business value and technica
       commitInfo,
       model,
       finalSourceBranch,
-      finalTargetBranch
+      finalTargetBranch,
+      noEmojis
     );
 
     if (!prMessage) {
@@ -487,6 +489,7 @@ async function main() {
     .option("--ollama-host <url>", "Ollama host URL", "http://localhost:11434")
     .option("--save", "Save PR message to file")
     .option("--no-interactive", "Disable interactive prompts")
+    .option("--no-emojis", "Generate PR message without emojis")
     .helpOption("-h, --help", "Display help for command");
 
   program.parse();
@@ -501,6 +504,7 @@ async function main() {
       model: options.model,
       save: options.save,
       interactive: options.interactive,
+      noEmojis: options.noEmojis,
     });
   } catch (error: any) {
     console.error(chalk.red("[ERROR]"), error.message);
