@@ -2798,7 +2798,7 @@ ${error.message}`);
       return false;
     }
   }
-  async generatePRMessage(commitInfo, model, sourceBranch, targetBranch, noEmojis = false) {
+  async generatePRMessage(commitInfo, model, sourceBranch, targetBranch, noEmojis = false, showThinking = false) {
     this.log.info(`Generating PR message using model: ${model}`);
     const prompt = `You are a senior software engineer reviewing code changes for a pull request. 
 
@@ -2864,7 +2864,11 @@ Keep the tone professional but concise. Focus on the business value and technica
       });
       const result = await response.json();
       if (result.response) {
-        return result.response;
+        let processedResponse = result.response;
+        if (!showThinking) {
+          processedResponse = processedResponse.replace(/<think>.*?<\/think>/gis, "").trim();
+        }
+        return processedResponse;
       } else {
         throw new Error("No response field in Ollama output");
       }
@@ -2899,10 +2903,11 @@ Keep the tone professional but concise. Focus on the business value and technica
     const {
       source: sourceBranch,
       target: targetBranch,
-      model = "deepseek-coder:latest",
+      model = "qwen3:latest",
       save = false,
       interactive = true,
-      noEmojis = false
+      noEmojis = false,
+      showThinking = false
     } = options;
     if (!this.isGitRepo()) {
       throw new Error("Not in a git repository");
@@ -2939,7 +2944,7 @@ Keep the tone professional but concise. Focus on the business value and technica
     if (!commitInfo.messages && !commitInfo.fileChanges) {
       throw new Error(`No commits found between ${finalTargetBranch} and ${finalSourceBranch}`);
     }
-    const prMessage = await this.generatePRMessage(commitInfo, model, finalSourceBranch, finalTargetBranch, noEmojis);
+    const prMessage = await this.generatePRMessage(commitInfo, model, finalSourceBranch, finalTargetBranch, noEmojis, showThinking);
     if (!prMessage) {
       throw new Error("Failed to generate PR message");
     }
@@ -2957,7 +2962,7 @@ ${source_default.blue.bold("=== GENERATED PR MESSAGE ===")}`);
   }
 }
 async function main() {
-  program.name("pr-generator").description("Generate PR messages using Ollama and git analysis").version("1.0.0").option("-s, --source <branch>", "Source branch with changes (default: current branch)").option("-t, --target <branch>", "Target branch (default: auto-detect main/master)").option("-m, --model <model>", "Ollama model name", "deepseek-coder:latest").option("--ollama-host <url>", "Ollama host URL", "http://localhost:11434").option("--save", "Save PR message to file").option("--no-interactive", "Disable interactive prompts").option("--no-emojis", "Generate PR message without emojis").helpOption("-h, --help", "Display help for command");
+  program.name("pr-generator").description("Generate PR messages using Ollama and git analysis").version("1.0.0").option("-s, --source <branch>", "Source branch with changes (default: current branch)").option("-t, --target <branch>", "Target branch (default: auto-detect main/master)").option("-m, --model <model>", "Ollama model name", "qwen3:latest").option("--ollama-host <url>", "Ollama host URL", "http://localhost:11434").option("--save", "Save PR message to file").option("--no-interactive", "Disable interactive prompts").option("--no-emojis", "Generate PR message without emojis").option("--show-thinking", "Show AI thinking process (useful for debugging)").helpOption("-h, --help", "Display help for command");
   program.parse();
   const options = program.opts();
   try {
@@ -2968,7 +2973,8 @@ async function main() {
       model: options.model,
       save: options.save,
       interactive: options.interactive,
-      noEmojis: options.noEmojis
+      noEmojis: options.noEmojis,
+      showThinking: options.showThinking
     });
   } catch (error) {
     console.error(source_default.red("[ERROR]"), error.message);
