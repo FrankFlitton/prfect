@@ -26,6 +26,24 @@
     "url": "https://github.com/frankflitton/prfect/issues"
   },
   "homepage": "https://github.com/frankflitton/prfect#readme",
+  "keywords": [
+    "git",
+    "pr",
+    "pull-request",
+    "ai",
+    "ollama",
+    "automation",
+    "cli",
+    "commit",
+    "description",
+    "generator",
+    "qwen3",
+    "deepseek",
+    "gemma",
+    "llama",
+    "typescript",
+    "developer-tools"
+  ],
   "dependencies": {
     "chalk": "^5.4.1",
     "commander": "^14.0.0"
