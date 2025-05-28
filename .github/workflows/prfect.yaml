@@ -254,7 +254,11 @@ jobs:
           BODY=$(echo "$PR_DATA" | jq -r '.body')
           
           # Add Prfect signature to the body for detection on future runs
-          BODY_WITH_SIGNATURE="$BODY\n---\n*Generated with [Prfect](https://github.com/frankflitton/prfect) 🤖*"
+          BODY_WITH_SIGNATURE="$BODY
+          
+          ---
+            
+          Generated with [Prfect](https://github.com/frankflitton/prfect) 🤖*"
 
           # Save to files to preserve formatting
           echo "$TITLE" > /tmp/pr_title.txt
