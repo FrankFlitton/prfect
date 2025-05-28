@@ -81,4 +81,37 @@ export class OutputProcessor {
     // eslint-disable-next-line no-control-regex
     return content.replace(/\x1b\[[0-9;]*m/g, '');
   }
+
+  /**
+   * Extracts title and body from PR message for CI mode
+   */
+  public static extractTitleAndBody(prMessage: string): { title: string; body: string } {
+    const lines = prMessage.trim().split('\n');
+    
+    // Find the first non-empty line as title
+    let title = '';
+    let bodyStartIndex = 0;
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (line && !title) {
+        // Remove common PR title prefixes and markdown headers
+        title = line.replace(/^#+\s*/, '').replace(/^(feat|fix|docs|style|refactor|test|chore):\s*/i, '').trim();
+        bodyStartIndex = i + 1;
+        break;
+      }
+    }
+    
+    // Skip empty lines after title and collect body
+    while (bodyStartIndex < lines.length && !lines[bodyStartIndex].trim()) {
+      bodyStartIndex++;
+    }
+    
+    const body = lines.slice(bodyStartIndex).join('\n').trim();
+    
+    return {
+      title: title || 'Auto-generated PR',
+      body: body || 'No description provided'
+    };
+  }
 }

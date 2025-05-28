@@ -43,10 +43,12 @@ class PRGenerator {
     return this.gitAnalyzer.branchExists(branch);
   }
 
-  private getCommitsInfo(sourceBranch: string, targetBranch: string): CommitInfo {
-    this.log.info(
-      `Analyzing commits between ${targetBranch} and ${sourceBranch}...`
-    );
+  private getCommitsInfo(sourceBranch: string, targetBranch: string, silent = false): CommitInfo {
+    if (!silent) {
+      this.log.info(
+        `Analyzing commits between ${targetBranch} and ${sourceBranch}...`
+      );
+    }
     return this.gitAnalyzer.getCommitsInfo(sourceBranch, targetBranch);
   }
 
@@ -79,9 +81,12 @@ class PRGenerator {
     sourceBranch: string,
     targetBranch: string,
     noEmojis = false,
-    showThinking = false
+    showThinking = false,
+    silent = false
   ): Promise<string> {
-    this.log.info(`Generating PR message using model: ${model}`);
+    if (!silent) {
+      this.log.info(`Generating PR message using model: ${model}`);
+    }
 
     try {
       const response = await this.ollamaClient.generatePRMessage(
@@ -130,6 +135,7 @@ class PRGenerator {
       interactive?: boolean;
       noEmojis?: boolean;
       showThinking?: boolean;
+      ci?: boolean;
     } = {}
   ): Promise<string> {
     const {
@@ -140,6 +146,7 @@ class PRGenerator {
       interactive = true,
       noEmojis = false,
       showThinking = false,
+      ci = false,
     } = options;
 
     // Check if in git repo
@@ -165,7 +172,9 @@ class PRGenerator {
           "Could not detect default branch. Please specify target branch."
         );
       }
-      this.log.info(`Auto-detected target branch: ${finalTargetBranch}`);
+      if (!ci) {
+        this.log.info(`Auto-detected target branch: ${finalTargetBranch}`);
+      }
     }
 
     // Validate branches exist
@@ -177,20 +186,35 @@ class PRGenerator {
       throw new Error(`Target branch '${finalTargetBranch}' does not exist`);
     }
 
-    this.log.info(`Source branch: ${finalSourceBranch}`);
-    this.log.info(`Target branch: ${finalTargetBranch}`);
-    this.log.info(`Model: ${model}`);
+    if (!ci) {
+      this.log.info(`Source branch: ${finalSourceBranch}`);
+      this.log.info(`Target branch: ${finalTargetBranch}`);
+      this.log.info(`Model: ${model}`);
+    }
 
-    // Check Ollama setup
-    const ollamaReady = await this.checkOllamaSetup(model);
-    if (!ollamaReady) {
-      throw new Error("Ollama setup check failed");
+    // Check Ollama setup (skip verbose output in CI mode)
+    if (ci) {
+      try {
+        const availableModels = await this.ollamaClient.getAvailableModels();
+        const modelNames = availableModels.map(m => m.name);
+        if (!modelNames.includes(model)) {
+          throw new Error(`Model '${model}' not found`);
+        }
+      } catch (error: any) {
+        throw new Error(`Ollama is not accessible at ${this.ollamaClient.getHost()}`);
+      }
+    } else {
+      const ollamaReady = await this.checkOllamaSetup(model);
+      if (!ollamaReady) {
+        throw new Error("Ollama setup check failed");
+      }
     }
 
     // Get commits information
     const commitInfo = this.getCommitsInfo(
       finalSourceBranch,
-      finalTargetBranch
+      finalTargetBranch,
+      ci
     );
 
     if (!commitInfo.messages && !commitInfo.fileChanges) {
@@ -206,27 +230,40 @@ class PRGenerator {
       finalSourceBranch,
       finalTargetBranch,
       noEmojis,
-      showThinking
+      showThinking,
+      ci
     );
 
     if (!prMessage) {
       throw new Error("Failed to generate PR message");
     }
 
-    // Display result
-    console.log(`\n${chalk.blue.bold("=== GENERATED PR MESSAGE ===")}`);
-    console.log("=".repeat(50));
-    console.log(prMessage);
-    console.log("=".repeat(50));
-    this.log.success("PR message generated successfully!");
+    // Handle CI mode output
+    if (ci) {
+      const { title, body } = OutputProcessor.extractTitleAndBody(prMessage);
+      const output = {
+        title,
+        body,
+        source_branch: finalSourceBranch,
+        target_branch: finalTargetBranch
+      };
+      console.log(JSON.stringify(output, null, 2));
+    } else {
+      // Display result
+      console.log(`\n${chalk.blue.bold("=== GENERATED PR MESSAGE ===")}`);
+      console.log("=".repeat(50));
+      console.log(prMessage);
+      console.log("=".repeat(50));
+      this.log.success("PR message generated successfully!");
 
-    // Save to file if requested or prompted
-    if (
-      save ||
-      (interactive && (await this.promptUser("Save PR message to file?")))
-    ) {
-      const filename = this.saveToFile(prMessage);
-      this.log.success(`PR message saved to: ${filename}`);
+      // Save to file if requested or prompted
+      if (
+        save ||
+        (interactive && (await this.promptUser("Save PR message to file?")))
+      ) {
+        const filename = this.saveToFile(prMessage);
+        this.log.success(`PR message saved to: ${filename}`);
+      }
     }
 
     return prMessage;
@@ -256,6 +293,10 @@ async function main() {
       "--show-thinking",
       "Show AI thinking process (useful for debugging)"
     )
+    .option(
+      "--ci",
+      "CI mode: output PR title and body as JSON for GitHub Actions"
+    )
     .helpOption("-h, --help", "Display help for command");
 
   program.parse();
@@ -270,8 +311,9 @@ async function main() {
       model: options.model,
       save: options.save,
       interactive: options.interactive,
-      noEmojis: options.noEmojis,
+      noEmojis: !options.emojis, // Convert emojis flag to noEmojis
       showThinking: options.showThinking,
+      ci: options.ci,
     });
   } catch (error: any) {
     console.error(chalk.red("[ERROR]"), error.message);

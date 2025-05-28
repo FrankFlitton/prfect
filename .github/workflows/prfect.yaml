@@ -1,0 +1,282 @@
+name: Auto-generate PR descriptions with Prfect
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  generate-pr-description:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    timeout-minutes: 15 # Prevent job from running too long
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Need full history for git analysis
+          ref: ${{ github.head_ref }} # Checkout the PR branch
+
+      - name: Setup git branches
+        run: |
+          # Debug current state
+          echo "=== Git Repository State ==="
+          git remote -v
+          git branch -a
+          echo "Default branch: $(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@')"
+
+          # Ensure we have the target branch locally
+          TARGET_BRANCH="${{ github.base_ref }}"
+          echo "Target branch: $TARGET_BRANCH"
+
+          # Fetch and create target branch if it doesn't exist locally
+          if ! git show-ref --verify --quiet refs/heads/$TARGET_BRANCH; then
+            echo "Creating local branch $TARGET_BRANCH from origin/$TARGET_BRANCH"
+            git fetch origin $TARGET_BRANCH:$TARGET_BRANCH || {
+              echo "Failed to fetch $TARGET_BRANCH, trying to fetch all branches"
+              git fetch origin
+              git branch -r | grep "origin/$TARGET_BRANCH" || {
+                echo "Target branch $TARGET_BRANCH not found in remote, using default branch"
+                DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@')
+                git checkout -b $TARGET_BRANCH origin/$DEFAULT_BRANCH
+              }
+            }
+          fi
+
+          echo "=== Final Branch State ==="
+          git branch -a
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb', '**/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Cache Ollama binary
+        id: cache-ollama
+        uses: actions/cache@v4
+        with:
+          path: |
+            /usr/local/bin/ollama
+            ~/.ollama
+          key: ${{ runner.os }}-ollama-${{ hashFiles('.github/workflows/prfect.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-ollama-
+
+      - name: Install Ollama
+        if: steps.cache-ollama.outputs.cache-hit != 'true'
+        run: |
+          echo "Installing Ollama (not cached)..."
+          curl -fsSL https://ollama.com/install.sh | sh
+
+      - name: Cache Ollama models
+        id: cache-models
+        uses: actions/cache@v4
+        with:
+          path: ~/.ollama/models
+          key: ${{ runner.os }}-ollama-models-multi-v2
+          restore-keys: |
+            ${{ runner.os }}-ollama-models-multi-
+            ${{ runner.os }}-ollama-models-qwen3-0.6b-
+            ${{ runner.os }}-ollama-models-qwen3-
+            ${{ runner.os }}-ollama-models-
+
+      - name: Start Ollama service
+        run: |
+          echo "Starting Ollama service..."
+          # Set resource limits for GitHub Actions
+          export OLLAMA_HOST=0.0.0.0:11434
+          export OLLAMA_NUM_PARALLEL=1
+          export OLLAMA_MAX_LOADED_MODELS=1
+          export OLLAMA_FLASH_ATTENTION=false
+          
+          ollama serve &
+          OLLAMA_PID=$!
+          sleep 10 # Wait for service to start
+
+          # Verify Ollama is running with extended timeout
+          echo "Waiting for Ollama to be ready..."
+          timeout 60s bash -c 'until curl -s http://localhost:11434/api/version; do echo "Waiting..."; sleep 2; done'
+          
+          if curl -s http://localhost:11434/api/version > /dev/null; then
+            echo "✅ Ollama service is running"
+          else
+            echo "❌ Ollama failed to start"
+            kill $OLLAMA_PID 2>/dev/null || true
+            exit 1
+          fi
+
+      - name: Pull AI model
+        if: steps.cache-models.outputs.cache-hit != 'true'
+        timeout-minutes: 8
+        run: |
+          echo "Pulling qwen3:0.6b model (not cached)..."
+          # Use timeout to prevent hanging
+          timeout 480s ollama pull qwen3:0.6b || {
+            echo "⚠️ Model pull timed out, trying smaller model..."
+            ollama pull qwen:0.5b || ollama pull tinyllama
+          }
+          echo "✅ Model pulled successfully"
+
+      - name: Verify cached model
+        if: steps.cache-models.outputs.cache-hit == 'true'
+        run: |
+          echo "Using cached model..."
+          ollama list
+          # Check if the specific model we need is available
+          if ollama list | grep -q "qwen3:0.6b"; then
+            echo "✅ Cached model qwen3:0.6b verified"
+          else
+            echo "⚠️ Cache hit but qwen3:0.6b not found, will pull"
+            ollama pull qwen3:0.6b
+          fi
+
+      - name: Install Prfect dependencies
+        run: |
+          echo "Installing dependencies..."
+          bun install --frozen-lockfile
+
+      - name: Cache Prfect build
+        uses: actions/cache@v4
+        with:
+          path: dist/
+          key: ${{ runner.os }}-prfect-build-${{ hashFiles('**/*.ts', '**/tsconfig.json', '**/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-prfect-build-
+
+      - name: Build Prfect
+        run: |
+          echo "Building Prfect..."
+          bun run build
+          echo "✅ Build completed"
+
+      - name: Generate PR description
+        id: generate
+        timeout-minutes: 5
+        run: |
+          # Verify branches exist before running Prfect
+          echo "Checking git setup..."
+          git branch -a
+          echo "Current branch: $(git branch --show-current)"
+          echo "Source: ${{ github.head_ref }}, Target: ${{ github.base_ref }}"
+
+          # Ensure we're on the correct branch
+          git checkout ${{ github.head_ref }} || echo "Already on source branch"
+
+          # Check which model is available and use the best one
+          AVAILABLE_MODEL=""
+          if ollama list | grep -q "qwen3:0.6b"; then
+            AVAILABLE_MODEL="qwen3:0.6b"
+          elif ollama list | grep -q "qwen:0.5b"; then
+            AVAILABLE_MODEL="qwen:0.5b"
+          elif ollama list | grep -q "tinyllama"; then
+            AVAILABLE_MODEL="tinyllama"
+          else
+            echo "❌ No suitable model found"
+            exit 1
+          fi
+
+          echo "Using model: $AVAILABLE_MODEL"
+
+          # Generate PR data using Prfect CI mode with timeout
+          echo "Running Prfect in CI mode..."
+          timeout 240s node dist/index.js --ci \
+            --source ${{ github.head_ref }} \
+            --target ${{ github.base_ref }} \
+            --model "$AVAILABLE_MODEL" \
+            --no-emojis > /tmp/pr_data.json || {
+            echo "❌ Prfect timed out or failed"
+            echo '{"title":"PR Update","body":"Auto-generation failed due to timeout. Please add description manually."}' > /tmp/pr_data.json
+          }
+
+          PR_DATA=$(cat /tmp/pr_data.json)
+          echo "Generated PR data:"
+          echo "$PR_DATA"
+
+          # Extract title and body using jq
+          TITLE=$(echo "$PR_DATA" | jq -r '.title')
+          BODY=$(echo "$PR_DATA" | jq -r '.body')
+
+          # Save to files to preserve formatting
+          echo "$TITLE" > /tmp/pr_title.txt
+          echo "$BODY" > /tmp/pr_body.txt
+
+          # Set outputs for next step using multiline format
+          {
+            echo "title<<EOF"
+            echo "$TITLE"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+          {
+            echo "body<<EOF"
+            echo "$BODY" 
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+          # Debug: Show what was generated
+          echo "Generated Title: $TITLE"
+          echo "Generated Body: $BODY"
+
+      - name: Update PR title and description
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Check if we can edit PRs
+          echo "Checking permissions..."
+          
+          # Read title and body from temp files to preserve formatting
+          TITLE=$(cat /tmp/pr_title.txt)
+          BODY=$(cat /tmp/pr_body.txt)
+          
+          # Try to update the PR title and body using files to preserve newlines
+          if gh pr edit ${{ github.event.pull_request.number }} \
+            --title "$TITLE" \
+            --body-file /tmp/pr_body.txt; then
+            echo "✅ PR title and description updated successfully!"
+          else
+            echo "❌ Failed to update PR directly. This might be a permissions issue."
+            echo "Generated title: $TITLE"
+            echo "Generated body content saved to temp file"
+            
+            # Fallback: Just add a comment with the generated content
+            gh pr comment ${{ github.event.pull_request.number }} --body "🤖 **Auto-generated PR content**
+
+            **Suggested Title:** $TITLE
+
+            **Suggested Description:**
+            $BODY
+
+            *Note: Unable to update PR directly due to permissions. Please copy the content above manually.*"
+          fi
+
+      - name: Add comment with generation info
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Only add this comment if PR was successfully updated
+          if [[ -f /tmp/pr_title.txt ]]; then
+            gh pr comment ${{ github.event.pull_request.number }} --body "🤖 **PR description auto-generated by Prfect**
+
+          This pull request description was automatically generated using AI analysis of your git commits and code changes.
+
+          **Model used:** qwen3:0.6b
+          **Source:** ${{ github.head_ref }} → ${{ github.base_ref }}
+          **Generated at:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+
+          If you'd like to modify the description, feel free to edit it manually."
+          fi

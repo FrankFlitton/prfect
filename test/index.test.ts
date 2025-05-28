@@ -90,6 +90,54 @@ After content`;
       const limited = OutputProcessor.limitLines(content, 3);
       expect(limited).toBe("line1\nline2\nline3");
     });
+
+    test("should extract title and body from simple PR message", () => {
+      const prMessage = "Add new feature\n\nThis PR adds a new feature that does something useful.";
+      const { title, body } = OutputProcessor.extractTitleAndBody(prMessage);
+      
+      expect(title).toBe("Add new feature");
+      expect(body).toBe("This PR adds a new feature that does something useful.");
+    });
+
+    test("should extract title and body from PR message with markdown header", () => {
+      const prMessage = "# feat: Add authentication system\n\n## Summary\nImplements JWT authentication with proper validation.";
+      const { title, body } = OutputProcessor.extractTitleAndBody(prMessage);
+      
+      expect(title).toBe("Add authentication system");
+      expect(body).toBe("## Summary\nImplements JWT authentication with proper validation.");
+    });
+
+    test("should extract title and body from conventional commit format", () => {
+      const prMessage = "fix: resolve login validation issue\n\nFixes bug where users couldn't log in with special characters.";
+      const { title, body } = OutputProcessor.extractTitleAndBody(prMessage);
+      
+      expect(title).toBe("resolve login validation issue");
+      expect(body).toBe("Fixes bug where users couldn't log in with special characters.");
+    });
+
+    test("should handle PR message with only title", () => {
+      const prMessage = "Update documentation";
+      const { title, body } = OutputProcessor.extractTitleAndBody(prMessage);
+      
+      expect(title).toBe("Update documentation");
+      expect(body).toBe("No description provided");
+    });
+
+    test("should handle empty PR message", () => {
+      const prMessage = "";
+      const { title, body } = OutputProcessor.extractTitleAndBody(prMessage);
+      
+      expect(title).toBe("Auto-generated PR");
+      expect(body).toBe("No description provided");
+    });
+
+    test("should handle PR message with multiple empty lines", () => {
+      const prMessage = "\n\n\nImprove performance\n\n\n\nOptimized database queries and reduced API calls.\n\n\n";
+      const { title, body } = OutputProcessor.extractTitleAndBody(prMessage);
+      
+      expect(title).toBe("Improve performance");
+      expect(body).toBe("Optimized database queries and reduced API calls.");
+    });
   });
 
   describe("GitAnalyzer", () => {

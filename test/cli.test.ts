@@ -1,11 +1,13 @@
-import { test, expect, describe } from "bun:test";
+import { test, expect, describe, beforeEach } from "bun:test";
 import { program } from "commander";
 
 describe("CLI Options", () => {
   beforeEach(() => {
     // Reset program state before each test
-    program.commands.length = 0;
-    program.options.length = 0;
+    // @ts-ignore
+    program.commands = [];
+    // @ts-ignore
+    program.options = [];
   });
 
   describe("Option definitions", () => {
@@ -15,17 +17,34 @@ describe("CLI Options", () => {
         .name("pr-generator")
         .description("Generate PR messages using Ollama and git analysis")
         .version("1.0.0")
-        .option("-s, --source <branch>", "Source branch with changes (default: current branch)")
-        .option("-t, --target <branch>", "Target branch (default: auto-detect main/master)")
+        .option(
+          "-s, --source <branch>",
+          "Source branch with changes (default: current branch)"
+        )
+        .option(
+          "-t, --target <branch>",
+          "Target branch (default: auto-detect main/master)"
+        )
         .option("-m, --model <model>", "Ollama model name", "qwen3:latest")
-        .option("--ollama-host <url>", "Ollama host URL", "http://localhost:11434")
+        .option(
+          "--ollama-host <url>",
+          "Ollama host URL",
+          "http://localhost:11434"
+        )
         .option("--save", "Save PR message to file")
         .option("--no-interactive", "Disable interactive prompts")
         .option("--no-emojis", "Generate PR message without emojis")
-        .option("--show-thinking", "Show AI thinking process (useful for debugging)");
+        .option(
+          "--show-thinking",
+          "Show AI thinking process (useful for debugging)"
+        )
+        .option(
+          "--ci",
+          "CI mode: output PR title and body as JSON for GitHub Actions"
+        );
 
-      const options = testProgram.options.map(opt => opt.flags);
-      
+      const options = testProgram.options.map((opt) => opt.flags);
+
       expect(options).toContain("-s, --source <branch>");
       expect(options).toContain("-t, --target <branch>");
       expect(options).toContain("-m, --model <model>");
@@ -34,19 +53,26 @@ describe("CLI Options", () => {
       expect(options).toContain("--no-interactive");
       expect(options).toContain("--no-emojis");
       expect(options).toContain("--show-thinking");
+      expect(options).toContain("--ci");
     });
 
     test("should have correct default values", () => {
       const testProgram = program
         .option("-m, --model <model>", "Ollama model name", "qwen3:latest")
-        .option("--ollama-host <url>", "Ollama host URL", "http://localhost:11434");
+        .option(
+          "--ollama-host <url>",
+          "Ollama host URL",
+          "http://localhost:11434"
+        );
 
       // Simulate parsing with no arguments to get defaults
       testProgram.parse([]);
       const opts = testProgram.opts();
-      
+
       expect(opts.model || "qwen3:latest").toBe("qwen3:latest");
-      expect(opts.ollamaHost || "http://localhost:11434").toBe("http://localhost:11434");
+      expect(opts.ollamaHost || "http://localhost:11434").toBe(
+        "http://localhost:11434"
+      );
     });
   });
 
@@ -57,9 +83,12 @@ describe("CLI Options", () => {
         .option("-t, --target <branch>", "Target branch");
 
       testProgram.parse([
-        "node", "prfect", 
-        "--source", "feature/test", 
-        "--target", "main"
+        "node",
+        "prfect",
+        "--source",
+        "feature/test",
+        "--target",
+        "main",
       ]);
 
       const opts = testProgram.opts();
@@ -68,13 +97,13 @@ describe("CLI Options", () => {
     });
 
     test("should parse model option", () => {
-      const testProgram = program
-        .option("-m, --model <model>", "Ollama model name", "qwen3:latest");
+      const testProgram = program.option(
+        "-m, --model <model>",
+        "Ollama model name",
+        "qwen3:latest"
+      );
 
-      testProgram.parse([
-        "node", "prfect", 
-        "--model", "deepseek-coder:latest"
-      ]);
+      testProgram.parse(["node", "prfect", "--model", "deepseek-coder:latest"]);
 
       const opts = testProgram.opts();
       expect(opts.model).toBe("deepseek-coder:latest");
@@ -85,30 +114,39 @@ describe("CLI Options", () => {
         .option("--save", "Save PR message to file")
         .option("--no-interactive", "Disable interactive prompts")
         .option("--no-emojis", "Generate PR message without emojis")
-        .option("--show-thinking", "Show AI thinking process");
+        .option("--show-thinking", "Show AI thinking process")
+        .option("--ci", "CI mode: output JSON");
 
       testProgram.parse([
-        "node", "prfect", 
-        "--save", 
-        "--no-interactive", 
+        "node",
+        "prfect",
+        "--save",
+        "--no-interactive",
         "--no-emojis",
-        "--show-thinking"
+        "--show-thinking",
+        "--ci",
       ]);
 
       const opts = testProgram.opts();
       expect(opts.save).toBe(true);
       expect(opts.interactive).toBe(false); // no- prefix inverts
-      expect(opts.noEmojis).toBe(true);
+      expect(opts.emojis).toBe(false); // --no-emojis sets emojis to false
       expect(opts.showThinking).toBe(true);
+      expect(opts.ci).toBe(true);
     });
 
     test("should handle custom Ollama host", () => {
-      const testProgram = program
-        .option("--ollama-host <url>", "Ollama host URL", "http://localhost:11434");
+      const testProgram = program.option(
+        "--ollama-host <url>",
+        "Ollama host URL",
+        "http://localhost:11434"
+      );
 
       testProgram.parse([
-        "node", "prfect", 
-        "--ollama-host", "http://192.168.1.100:11434"
+        "node",
+        "prfect",
+        "--ollama-host",
+        "http://192.168.1.100:11434",
       ]);
 
       const opts = testProgram.opts();
@@ -125,18 +163,21 @@ describe("CLI Options", () => {
         .option("--no-emojis", "No emojis");
 
       testProgram.parse([
-        "node", "prfect",
-        "--source", "feature/new-auth",
-        "--model", "qwen3:4b", 
+        "node",
+        "prfect",
+        "--source",
+        "feature/new-auth",
+        "--model",
+        "qwen3:4b",
         "--save",
-        "--no-emojis"
+        "--no-emojis",
       ]);
 
       const opts = testProgram.opts();
       expect(opts.source).toBe("feature/new-auth");
       expect(opts.model).toBe("qwen3:4b");
       expect(opts.save).toBe(true);
-      expect(opts.noEmojis).toBe(true);
+      expect(opts.emojis).toBe(false); // --no-emojis sets emojis to false
     });
 
     test("should handle short and long option formats", () => {
@@ -146,10 +187,14 @@ describe("CLI Options", () => {
         .option("-m, --model <model>", "Model");
 
       testProgram.parse([
-        "node", "prfect",
-        "-s", "feat/test",
-        "-t", "develop", 
-        "-m", "llama3:latest"
+        "node",
+        "prfect",
+        "-s",
+        "feat/test",
+        "-t",
+        "develop",
+        "-m",
+        "llama3:latest",
       ]);
 
       const opts = testProgram.opts();
@@ -167,7 +212,9 @@ describe("CLI Options", () => {
         .helpOption("-h, --help", "Display help for command");
 
       expect(testProgram.name()).toBe("pr-generator");
-      expect(testProgram.description()).toBe("Generate PR messages using Ollama and git analysis");
+      expect(testProgram.description()).toBe(
+        "Generate PR messages using Ollama and git analysis"
+      );
     });
 
     test("should handle version option", () => {
@@ -181,13 +228,14 @@ describe("CLI Options", () => {
       // Simulate the mapping done in main()
       const cliOptions = {
         source: "feature/test",
-        target: "main", 
+        target: "main",
         model: "qwen3:latest",
         save: true,
         interactive: false,
-        noEmojis: true,
+        emojis: false,
         showThinking: false,
-        ollamaHost: "http://localhost:11434"
+        ci: false,
+        ollamaHost: "http://localhost:11434",
       };
 
       const runOptions = {
@@ -196,8 +244,9 @@ describe("CLI Options", () => {
         model: cliOptions.model,
         save: cliOptions.save,
         interactive: cliOptions.interactive,
-        noEmojis: cliOptions.noEmojis,
-        showThinking: cliOptions.showThinking
+        noEmojis: !cliOptions.emojis, // Convert emojis flag to noEmojis
+        showThinking: cliOptions.showThinking,
+        ci: cliOptions.ci,
       };
 
       expect(runOptions.source).toBe("feature/test");
@@ -205,8 +254,67 @@ describe("CLI Options", () => {
       expect(runOptions.model).toBe("qwen3:latest");
       expect(runOptions.save).toBe(true);
       expect(runOptions.interactive).toBe(false);
-      expect(runOptions.noEmojis).toBe(true);
+      expect(runOptions.noEmojis).toBe(true); // !false = true
       expect(runOptions.showThinking).toBe(false);
+      expect(runOptions.ci).toBe(false);
+    });
+  });
+
+  describe("CI Mode", () => {
+    test("should parse CI flag correctly", () => {
+      const testProgram = program.option(
+        "--ci",
+        "CI mode: output PR title and body as JSON"
+      );
+
+      testProgram.parse(["node", "prfect", "--ci"]);
+
+      const opts = testProgram.opts();
+      expect(opts.ci).toBe(true);
+    });
+
+    test("should handle CI mode with other options", () => {
+      const testProgram = program
+        .option("-s, --source <branch>", "Source branch")
+        .option("-m, --model <model>", "Model", "qwen3:latest")
+        .option("--no-emojis", "No emojis")
+        .option("--ci", "CI mode", false);
+
+      testProgram.parse([
+        "node",
+        "prfect",
+        "--source",
+        "feature/ci-test",
+        "--model",
+        "qwen3:4b",
+        "--no-emojis",
+        "--ci",
+      ]);
+
+      const opts = testProgram.opts();
+      expect(opts.source).toBe("feature/ci-test");
+      expect(opts.model).toBe("qwen3:4b");
+      expect(opts.emojis).toBe(false); // --no-emojis sets emojis to false
+      expect(opts.ci).toBe(true);
+    });
+
+    test("should validate CI mode JSON output structure", () => {
+      const mockOutput = {
+        title: "Add new feature",
+        body: "This PR adds a new feature that improves functionality.",
+        source_branch: "feature/test",
+        target_branch: "main",
+      };
+
+      expect(mockOutput).toHaveProperty("title");
+      expect(mockOutput).toHaveProperty("body");
+      expect(mockOutput).toHaveProperty("source_branch");
+      expect(mockOutput).toHaveProperty("target_branch");
+
+      expect(typeof mockOutput.title).toBe("string");
+      expect(typeof mockOutput.body).toBe("string");
+      expect(typeof mockOutput.source_branch).toBe("string");
+      expect(typeof mockOutput.target_branch).toBe("string");
     });
   });
 });
