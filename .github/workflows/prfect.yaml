@@ -4,6 +4,11 @@ on:
   pull_request:
     types: [opened, synchronize]
 
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
 jobs:
   generate-pr-description:
     runs-on: ubuntu-latest
@@ -174,12 +179,29 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Update the PR title and body
-          gh pr edit ${{ github.event.pull_request.number }} \
+          # Check if we can edit PRs
+          echo "Checking permissions..."
+          
+          # Try to update the PR title and body
+          if gh pr edit ${{ github.event.pull_request.number }} \
             --title "${{ steps.generate.outputs.title }}" \
-            --body "${{ steps.generate.outputs.body }}"
+            --body "${{ steps.generate.outputs.body }}"; then
+            echo "✅ PR title and description updated successfully!"
+          else
+            echo "❌ Failed to update PR directly. This might be a permissions issue."
+            echo "Generated title: ${{ steps.generate.outputs.title }}"
+            echo "Generated body: ${{ steps.generate.outputs.body }}"
             
-          echo "✅ PR title and description updated successfully!"
+            # Fallback: Just add a comment with the generated content
+            gh pr comment ${{ github.event.pull_request.number }} --body "🤖 **Auto-generated PR content**
+
+            **Suggested Title:** ${{ steps.generate.outputs.title }}
+
+            **Suggested Description:**
+            ${{ steps.generate.outputs.body }}
+
+            *Note: Unable to update PR directly due to permissions. Please copy the content above manually.*"
+          fi
 
       - name: Add comment with generation info
         env:
