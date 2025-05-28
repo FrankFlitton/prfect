@@ -1,4 +1,4 @@
-name: Auto-generate PR descriptions with Prfect
+name: Prfect AI PR descriptions 
 
 on:
   pull_request:
@@ -10,7 +10,7 @@ permissions:
   issues: write
 
 jobs:
-  generate-pr-description:
+  prfect-ai-pr-description:
     runs-on: ubuntu-latest
     if: github.event.pull_request.draft == false
     timeout-minutes: 15 # Prevent job from running too long

@@ -2113,7 +2113,6 @@ var require_commander = __commonJS((exports) => {
 });
 
 // index.ts
-import { execSync } from "child_process";
 import { writeFileSync } from "fs";
 
 // node_modules/commander/esm.mjs
@@ -2617,17 +2616,11 @@ var source_default = chalk;
 
 // index.ts
 import readline from "readline";
-class PRGenerator {
-  ollamaHost;
-  constructor(ollamaHost = "http://localhost:11434") {
-    this.ollamaHost = ollamaHost;
-  }
-  log = {
-    info: (msg) => console.log(source_default.green("[INFO]"), msg),
-    warn: (msg) => console.log(source_default.yellow("[WARN]"), msg),
-    error: (msg) => console.log(source_default.red("[ERROR]"), msg),
-    success: (msg) => console.log(source_default.green("✓"), msg)
-  };
+
+// src/utils/GitAnalyzer.ts
+import { execSync } from "child_process";
+
+class GitAnalyzer {
   runGitCommand(command) {
     try {
       return execSync(`git ${command.join(" ")}`, {
@@ -2714,7 +2707,6 @@ ${error.message}`);
     }
   }
   getCommitsInfo(sourceBranch, targetBranch) {
-    this.log.info(`Analyzing commits between ${targetBranch} and ${sourceBranch}...`);
     const mergeBase = this.runGitCommand([
       "merge-base",
       targetBranch,
@@ -2730,7 +2722,6 @@ ${error.message}`);
         "--pretty=format:- %s (%an, %ar)"
       ]);
     } catch (error) {
-      this.log.warn("Could not fetch commit messages");
       messages = "No commit messages available";
     }
     let fileChanges = "";
@@ -2776,30 +2767,192 @@ ${error.message}`);
       codeSample
     };
   }
-  async checkOllamaSetup(model) {
-    this.log.info("Checking Ollama setup...");
+  getMergeBase(targetBranch, sourceBranch) {
+    return this.runGitCommand(["merge-base", targetBranch, sourceBranch]);
+  }
+  getFileChanges(mergeBase, sourceBranch, limit = 20) {
     try {
-      const response = await fetch(`${this.ollamaHost}/api/tags`, {
+      const changes = this.runGitCommand([
+        "diff",
+        "--name-status",
+        `${mergeBase}..${sourceBranch}`
+      ]);
+      return changes.split(`
+`).slice(0, limit).join(`
+`);
+    } catch (error) {
+      return "No file changes detected";
+    }
+  }
+  getCodeSample(mergeBase, sourceBranch, limit = 100) {
+    try {
+      const diff = this.runGitCommand([
+        "diff",
+        `${mergeBase}..${sourceBranch}`,
+        "--unified=3"
+      ]);
+      return diff.split(`
+`).slice(0, limit).join(`
+`);
+    } catch (error) {
+      return "No code changes available";
+    }
+  }
+}
+// src/utils/OutputProcessor.ts
+class OutputProcessor {
+  static processResponse(response, showThinking = false) {
+    if (showThinking) {
+      return response;
+    }
+    return response.replace(/<think>.*?<\/think>/gis, "").trim();
+  }
+  static generateFilename(prefix = "pr_message", extension = "md") {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
+    return `${prefix}_${timestamp}.${extension}`;
+  }
+  static limitLines(content, maxLines) {
+    return content.split(`
+`).slice(0, maxLines).join(`
+`);
+  }
+  static hasThinkingTags(content) {
+    return /<think>.*?<\/think>/gis.test(content);
+  }
+  static extractThinkingContent(content) {
+    const matches = content.match(/<think>(.*?)<\/think>/gis);
+    if (!matches)
+      return [];
+    return matches.map((match) => match.replace(/<\/?think>/gi, "").trim());
+  }
+  static countThinkingTags(content) {
+    const matches = content.match(/<think>.*?<\/think>/gis);
+    return matches ? matches.length : 0;
+  }
+  static validateFileExtension(filename, allowedExtensions = ["md", "txt"]) {
+    const extension = filename.split(".").pop()?.toLowerCase();
+    return extension ? allowedExtensions.includes(extension) : false;
+  }
+  static formatContent(content) {
+    return content.replace(/\n{3,}/g, `
+
+`).replace(/^\s+|\s+$/g, "").replace(/[ \t]+$/gm, "");
+  }
+  static stripAnsiCodes(content) {
+    return content.replace(/\x1b\[[0-9;]*m/g, "");
+  }
+  static extractTitleAndBody(prMessage) {
+    const lines = prMessage.trim().split(`
+`);
+    let title = "";
+    let bodyStartIndex = 0;
+    for (let i = 0;i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (line && !title) {
+        title = line.replace(/^#+\s*/, "").replace(/^(feat|fix|docs|style|refactor|test|chore):\s*/i, "").trim();
+        bodyStartIndex = i + 1;
+        break;
+      }
+    }
+    while (bodyStartIndex < lines.length && !lines[bodyStartIndex].trim()) {
+      bodyStartIndex++;
+    }
+    const body = lines.slice(bodyStartIndex).join(`
+`).trim();
+    return {
+      title: title || "Auto-generated PR",
+      body: body || "No description provided"
+    };
+  }
+}
+// src/utils/OllamaClient.ts
+class OllamaClient {
+  host;
+  constructor(host = "http://localhost:11434") {
+    this.host = host;
+  }
+  async getAvailableModels() {
+    try {
+      const response = await fetch(`${this.host}/api/tags`, {
         signal: AbortSignal.timeout(5000)
       });
-      const data = await response.json();
-      const availableModels = Array.isArray(data?.models) ? data.models.map((m) => m.name) : [];
-      if (!availableModels.includes(model)) {
-        this.log.warn(`Model '${model}' not found. Available models:`);
-        availableModels.forEach((m) => console.log(`  - ${m}`));
-        this.log.info("To install DeepSeek: ollama pull deepseek-coder:latest");
-        return false;
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-      this.log.success(`Ollama is running and model '${model}' is available`);
-      return true;
+      const data = await response.json();
+      return Array.isArray(data?.models) ? data.models : [];
     } catch (error) {
-      this.log.error(`Ollama is not accessible at ${this.ollamaHost}`);
-      this.log.error("Make sure Ollama is running: ollama serve");
+      if (error.name === "TimeoutError") {
+        throw new Error("Connection to Ollama timed out");
+      }
+      throw new Error(`Failed to connect to Ollama: ${error.message}`);
+    }
+  }
+  async isModelAvailable(modelName) {
+    try {
+      const models = await this.getAvailableModels();
+      return models.some((model) => model.name === modelName);
+    } catch {
       return false;
     }
   }
-  async generatePRMessage(commitInfo, model, sourceBranch, targetBranch, noEmojis = false, showThinking = false) {
-    this.log.info(`Generating PR message using model: ${model}`);
+  async generate(request) {
+    try {
+      const response = await fetch(`${this.host}/api/generate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          ...request,
+          stream: false,
+          options: {
+            temperature: 0.3,
+            top_p: 0.9,
+            num_predict: 1000,
+            ...request.options
+          }
+        }),
+        signal: AbortSignal.timeout(120000)
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      const result = await response.json();
+      if (!result.response) {
+        throw new Error("No response field in Ollama output");
+      }
+      return result;
+    } catch (error) {
+      if (error.name === "TimeoutError") {
+        throw new Error("Request timed out. The model might be taking too long to respond.");
+      }
+      throw new Error(`Failed to generate response: ${error.message}`);
+    }
+  }
+  async testConnection() {
+    try {
+      await this.getAvailableModels();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  getHost() {
+    return this.host;
+  }
+  setHost(host) {
+    this.host = host;
+  }
+  static validateHost(host) {
+    try {
+      const url = new URL(host);
+      return url.protocol === "http:" || url.protocol === "https:";
+    } catch {
+      return false;
+    }
+  }
+  async generatePRMessage(model, commitInfo, sourceBranch, targetBranch, options = {}) {
     const prompt = `You are a senior software engineer reviewing code changes for a pull request. 
 
 Based on the following git information, generate a clear and professional pull request description:
@@ -2829,13 +2982,10 @@ Please generate a PR description with the following structure:
 A brief 1-3 sentence synopsis of the work.
 
 ## Summary
-What this PR does and why it's needed. Anything new or changed should be explained here.
+What this PR does and why it's needed.
 
 ## Key Changes
-- [Maximum 5 bullet points of the most important changes that reviewers should focus on]
-- [Use concise, technical language]
-- [Avoid vague terms like "refactor" or "improve" - be specific about what was changed]
-- [If applicable, mention any new features or major changes]
+- [Maximum 5 bullet points of the most important changes]
 
 ## Breaking Changes
 [Only include if there are breaking changes]
@@ -2843,46 +2993,79 @@ What this PR does and why it's needed. Anything new or changed should be explain
 ## Testing
 [Include if applicable, describe how the changes were tested, any new tests added, etc.]
 
-Keep the tone professional but concise. Focus on the business value and technical changes. Maximum 1000 words total. Do not use placeholder text like "[Title]" - write the actual content.${noEmojis ? " Do not use any emojis in the response." : ""}`;
+Keep the tone professional but concise. Focus on the business value and technical changes. Maximum 1000 words total. Do not use placeholder text like "[Title]" - write the actual content.${options.noEmojis ? " Do not use any emojis in the response." : ""}`;
+    const response = await this.generate({
+      model,
+      prompt
+    });
+    return response.response;
+  }
+}
+// index.ts
+class PRGenerator {
+  gitAnalyzer;
+  ollamaClient;
+  constructor(ollamaHost = "http://localhost:11434") {
+    this.gitAnalyzer = new GitAnalyzer;
+    this.ollamaClient = new OllamaClient(ollamaHost);
+  }
+  log = {
+    info: (msg) => console.log(source_default.green("[INFO]"), msg),
+    warn: (msg) => console.log(source_default.yellow("[WARN]"), msg),
+    error: (msg) => console.log(source_default.red("[ERROR]"), msg),
+    success: (msg) => console.log(source_default.green("✓"), msg)
+  };
+  isGitRepo() {
+    return this.gitAnalyzer.isGitRepo();
+  }
+  getCurrentBranch() {
+    return this.gitAnalyzer.getCurrentBranch();
+  }
+  detectDefaultBranch() {
+    return this.gitAnalyzer.detectDefaultBranch();
+  }
+  branchExists(branch) {
+    return this.gitAnalyzer.branchExists(branch);
+  }
+  getCommitsInfo(sourceBranch, targetBranch, silent = false) {
+    if (!silent) {
+      this.log.info(`Analyzing commits between ${targetBranch} and ${sourceBranch}...`);
+    }
+    return this.gitAnalyzer.getCommitsInfo(sourceBranch, targetBranch);
+  }
+  async checkOllamaSetup(model) {
+    this.log.info("Checking Ollama setup...");
     try {
-      const response = await fetch(`${this.ollamaHost}/api/generate`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model,
-          prompt,
-          stream: false,
-          options: {
-            temperature: 0.3,
-            top_p: 0.9,
-            num_predict: 1000
-          }
-        }),
-        signal: AbortSignal.timeout(120000)
-      });
-      const result = await response.json();
-      if (result.response) {
-        let processedResponse = result.response;
-        if (!showThinking) {
-          processedResponse = processedResponse.replace(/<think>.*?<\/think>/gis, "").trim();
-        }
-        return processedResponse;
-      } else {
-        throw new Error("No response field in Ollama output");
+      const availableModels = await this.ollamaClient.getAvailableModels();
+      const modelNames = availableModels.map((m) => m.name);
+      if (!modelNames.includes(model)) {
+        this.log.warn(`Model '${model}' not found. Available models:`);
+        modelNames.forEach((m) => console.log(`  - ${m}`));
+        this.log.info("To install a model: ollama pull <model-name>");
+        return false;
       }
+      this.log.success(`Ollama is running and model '${model}' is available`);
+      return true;
     } catch (error) {
-      if (error.name === "TimeoutError") {
-        throw new Error("Request timed out. The model might be taking too long to respond.");
-      }
+      this.log.error(`Ollama is not accessible at ${this.ollamaClient.getHost()}`);
+      this.log.error("Make sure Ollama is running: ollama serve");
+      return false;
+    }
+  }
+  async generatePRMessage(commitInfo, model, sourceBranch, targetBranch, noEmojis = false, showThinking = false, silent = false) {
+    if (!silent) {
+      this.log.info(`Generating PR message using model: ${model}`);
+    }
+    try {
+      const response = await this.ollamaClient.generatePRMessage(model, commitInfo, sourceBranch, targetBranch, { noEmojis });
+      return OutputProcessor.processResponse(response, showThinking);
+    } catch (error) {
       throw new Error(`Failed to generate PR message: ${error.message}`);
     }
   }
   saveToFile(content, filename) {
     if (!filename) {
-      const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
-      filename = `pr_message_${timestamp}.md`;
+      filename = OutputProcessor.generateFilename();
     }
     writeFileSync(filename, content, "utf8");
     return filename;
@@ -2907,7 +3090,8 @@ Keep the tone professional but concise. Focus on the business value and technica
       save = false,
       interactive = true,
       noEmojis = false,
-      showThinking = false
+      showThinking = false,
+      ci = false
     } = options;
     if (!this.isGitRepo()) {
       throw new Error("Not in a git repository");
@@ -2925,7 +3109,9 @@ Keep the tone professional but concise. Focus on the business value and technica
       if (!finalTargetBranch) {
         throw new Error("Could not detect default branch. Please specify target branch.");
       }
-      this.log.info(`Auto-detected target branch: ${finalTargetBranch}`);
+      if (!ci) {
+        this.log.info(`Auto-detected target branch: ${finalTargetBranch}`);
+      }
     }
     if (!this.branchExists(finalSourceBranch)) {
       throw new Error(`Source branch '${finalSourceBranch}' does not exist`);
@@ -2933,36 +3119,61 @@ Keep the tone professional but concise. Focus on the business value and technica
     if (!this.branchExists(finalTargetBranch)) {
       throw new Error(`Target branch '${finalTargetBranch}' does not exist`);
     }
-    this.log.info(`Source branch: ${finalSourceBranch}`);
-    this.log.info(`Target branch: ${finalTargetBranch}`);
-    this.log.info(`Model: ${model}`);
-    const ollamaReady = await this.checkOllamaSetup(model);
-    if (!ollamaReady) {
-      throw new Error("Ollama setup check failed");
+    if (!ci) {
+      this.log.info(`Source branch: ${finalSourceBranch}`);
+      this.log.info(`Target branch: ${finalTargetBranch}`);
+      this.log.info(`Model: ${model}`);
     }
-    const commitInfo = this.getCommitsInfo(finalSourceBranch, finalTargetBranch);
+    if (ci) {
+      try {
+        const availableModels = await this.ollamaClient.getAvailableModels();
+        const modelNames = availableModels.map((m) => m.name);
+        if (!modelNames.includes(model)) {
+          throw new Error(`Model '${model}' not found`);
+        }
+      } catch (error) {
+        throw new Error(`Ollama is not accessible at ${this.ollamaClient.getHost()}`);
+      }
+    } else {
+      const ollamaReady = await this.checkOllamaSetup(model);
+      if (!ollamaReady) {
+        throw new Error("Ollama setup check failed");
+      }
+    }
+    const commitInfo = this.getCommitsInfo(finalSourceBranch, finalTargetBranch, ci);
     if (!commitInfo.messages && !commitInfo.fileChanges) {
       throw new Error(`No commits found between ${finalTargetBranch} and ${finalSourceBranch}`);
     }
-    const prMessage = await this.generatePRMessage(commitInfo, model, finalSourceBranch, finalTargetBranch, noEmojis, showThinking);
+    const prMessage = await this.generatePRMessage(commitInfo, model, finalSourceBranch, finalTargetBranch, noEmojis, showThinking, ci);
     if (!prMessage) {
       throw new Error("Failed to generate PR message");
     }
-    console.log(`
+    if (ci) {
+      const { title, body } = OutputProcessor.extractTitleAndBody(prMessage);
+      const output = {
+        title,
+        body,
+        source_branch: finalSourceBranch,
+        target_branch: finalTargetBranch
+      };
+      console.log(JSON.stringify(output, null, 2));
+    } else {
+      console.log(`
 ${source_default.blue.bold("=== GENERATED PR MESSAGE ===")}`);
-    console.log("=".repeat(50));
-    console.log(prMessage);
-    console.log("=".repeat(50));
-    this.log.success("PR message generated successfully!");
-    if (save || interactive && await this.promptUser("Save PR message to file?")) {
-      const filename = this.saveToFile(prMessage);
-      this.log.success(`PR message saved to: ${filename}`);
+      console.log("=".repeat(50));
+      console.log(prMessage);
+      console.log("=".repeat(50));
+      this.log.success("PR message generated successfully!");
+      if (save || interactive && await this.promptUser("Save PR message to file?")) {
+        const filename = this.saveToFile(prMessage);
+        this.log.success(`PR message saved to: ${filename}`);
+      }
     }
     return prMessage;
   }
 }
 async function main() {
-  program.name("pr-generator").description("Generate PR messages using Ollama and git analysis").version("1.0.0").option("-s, --source <branch>", "Source branch with changes (default: current branch)").option("-t, --target <branch>", "Target branch (default: auto-detect main/master)").option("-m, --model <model>", "Ollama model name", "qwen3:latest").option("--ollama-host <url>", "Ollama host URL", "http://localhost:11434").option("--save", "Save PR message to file").option("--no-interactive", "Disable interactive prompts").option("--no-emojis", "Generate PR message without emojis").option("--show-thinking", "Show AI thinking process (useful for debugging)").helpOption("-h, --help", "Display help for command");
+  program.name("pr-generator").description("Generate PR messages using Ollama and git analysis").version("1.0.0").option("-s, --source <branch>", "Source branch with changes (default: current branch)").option("-t, --target <branch>", "Target branch (default: auto-detect main/master)").option("-m, --model <model>", "Ollama model name", "qwen3:latest").option("--ollama-host <url>", "Ollama host URL", "http://localhost:11434").option("--save", "Save PR message to file").option("--no-interactive", "Disable interactive prompts").option("--no-emojis", "Generate PR message without emojis").option("--show-thinking", "Show AI thinking process (useful for debugging)").option("--ci", "CI mode: output PR title and body as JSON for GitHub Actions").helpOption("-h, --help", "Display help for command");
   program.parse();
   const options = program.opts();
   try {
@@ -2973,8 +3184,9 @@ async function main() {
       model: options.model,
       save: options.save,
       interactive: options.interactive,
-      noEmojis: options.noEmojis,
-      showThinking: options.showThinking
+      noEmojis: !options.emojis,
+      showThinking: options.showThinking,
+      ci: options.ci
     });
   } catch (error) {
     console.error(source_default.red("[ERROR]"), error.message);

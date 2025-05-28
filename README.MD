@@ -200,7 +200,7 @@ npm start
 Prfect works with any Ollama-compatible model:
 
 - **qwen3:latest** (Default)
-- **qwen3:4b**
+- **qwen3:0.6b** (Good for CI)
 - **gemma3:latest**
 - **deepseek-coder:latest**
 - **llama3:latest**
