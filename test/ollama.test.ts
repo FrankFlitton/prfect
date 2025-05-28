@@ -53,10 +53,10 @@ describe("OllamaClient", () => {
       }) as unknown as typeof fetch;
 
       try {
-        await client.testConnection();
+        await client.getAvailableModels(); // Use method that preserves errors
         expect(false).toBe(true); // Should not reach here
       } catch (error: any) {
-        expect(error.name).toBe("TimeoutError");
+        expect(error.message).toContain("Connection to Ollama timed out");
       }
     });
 
