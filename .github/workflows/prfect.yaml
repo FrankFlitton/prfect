@@ -14,6 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event.pull_request.draft == false
     timeout-minutes: 15 # Prevent job from running too long
+    # Note: This job runs independently and doesn't block merging
+    # Tests are handled in a separate workflow for better separation of concerns
 
     steps:
       - name: Checkout repository
