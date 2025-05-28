@@ -100,7 +100,7 @@ jobs:
           if [ "$TEST_STATUS" = "success" ]; then
             gh pr comment ${{ github.event.pull_request.number }} --body "✅ **Test Suite Passed**
 
-            All unit tests are passing! The code changes look good from a testing perspective.
+            All unit tests are passing!
 
             **Test runner:** Bun
             **Status:** $TEST_STATUS
