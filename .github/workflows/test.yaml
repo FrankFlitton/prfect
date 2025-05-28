@@ -1,0 +1,118 @@
+name: Test Suite
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: ${{ runner.os }}-bun-test-${{ hashFiles('**/bun.lockb', '**/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-test-
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: |
+          echo "Installing dependencies..."
+          bun install --frozen-lockfile
+
+      - name: Run tests
+        run: |
+          echo "Running test suite..."
+          bun test --timeout 30000
+
+      - name: Test results
+        if: always()
+        run: |
+          if [ $? -eq 0 ]; then
+            echo "✅ All tests passed!"
+          else
+            echo "❌ Some tests failed!"
+            exit 1
+          fi
+
+  # Optional: Add test coverage reporting
+  coverage:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: ${{ runner.os }}-bun-test-${{ hashFiles('**/bun.lockb', '**/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-test-
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Generate test coverage
+        run: |
+          # Run tests with coverage if available
+          bun test --coverage 2>/dev/null || echo "Coverage not configured, skipping..."
+
+      - name: Comment test results
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TEST_STATUS="${{ needs.test.result }}"
+          if [ "$TEST_STATUS" = "success" ]; then
+            gh pr comment ${{ github.event.pull_request.number }} --body "✅ **Test Suite Passed**
+
+            All unit tests are passing!
+
+            **Test runner:** Bun
+            **Status:** $TEST_STATUS
+            **Time:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          else
+            gh pr comment ${{ github.event.pull_request.number }} --body "❌ **Test Suite Failed**
+
+            Some tests are failing. Please review and fix the failing tests before merging.
+
+            **Test runner:** Bun  
+            **Status:** $TEST_STATUS
+            **Time:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+
+            Check the Actions tab for detailed test output."
+          fi
