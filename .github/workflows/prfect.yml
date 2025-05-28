@@ -1,0 +1,24 @@
+name: prfect-action
+description: GitHub Action that summarizes pull requests with AI (LLM)
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  summarize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup ollama
+        uses: ai-action/setup-ollama@v1
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Summarize pull request
+        shell: bash
+        run: |
+          npx prfect
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MODEL: qwen3:latest
