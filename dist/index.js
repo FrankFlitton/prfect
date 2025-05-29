@@ -17,6 +17,16 @@ var __toESM = (mod, isNodeMode, target) => {
   return to;
 };
 var __commonJS = (cb, mod) => () => (mod || cb((mod = { exports: {} }).exports, mod), mod.exports);
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, {
+      get: all[name],
+      enumerable: true,
+      configurable: true,
+      set: (newValue) => all[name] = () => newValue
+    });
+};
+var __esm = (fn, res) => () => (fn && (res = fn(fn = 0)), res);
 var __require = /* @__PURE__ */ createRequire(import.meta.url);
 
 // node_modules/commander/lib/error.js
@@ -2112,6 +2122,183 @@ var require_commander = __commonJS((exports) => {
   exports.InvalidOptionArgumentError = InvalidArgumentError;
 });
 
+// src/utils/TemplateLoader.ts
+var exports_TemplateLoader = {};
+__export(exports_TemplateLoader, {
+  TemplateLoader: () => TemplateLoader
+});
+import { readFileSync, existsSync } from "fs";
+import { join, dirname } from "path";
+var TemplateLoader;
+var init_TemplateLoader = __esm(() => {
+  TemplateLoader = class TemplateLoader {
+    static DEFAULT_TEMPLATE_PATHS = [
+      ".github/pull_request_template.md",
+      ".github/PULL_REQUEST_TEMPLATE.md",
+      "docs/pull_request_template.md",
+      ".github/PULL_REQUEST_TEMPLATE/pull_request_template.md"
+    ];
+    static loadTemplate(config = {}) {
+      if (config.templatePath) {
+        return this.loadFromPath(config.templatePath);
+      }
+      if (config.customTemplate) {
+        return config.customTemplate;
+      }
+      const foundTemplate = this.findGitHubTemplate();
+      if (foundTemplate) {
+        return foundTemplate;
+      }
+      return this.getDefaultTemplate();
+    }
+    static loadFromPath(templatePath) {
+      try {
+        const absolutePath = this.resolveTemplatePath(templatePath);
+        if (!existsSync(absolutePath)) {
+          throw new Error(`Template file not found: ${absolutePath}`);
+        }
+        return readFileSync(absolutePath, "utf8");
+      } catch (error) {
+        throw new Error(`Failed to load template from ${templatePath}: ${error.message}`);
+      }
+    }
+    static findGitHubTemplate() {
+      const repoRoot = this.findRepositoryRoot();
+      if (!repoRoot)
+        return null;
+      for (const templatePath of this.DEFAULT_TEMPLATE_PATHS) {
+        const fullPath = join(repoRoot, templatePath);
+        if (existsSync(fullPath)) {
+          try {
+            return readFileSync(fullPath, "utf8");
+          } catch (error) {
+            continue;
+          }
+        }
+      }
+      return null;
+    }
+    static findRepositoryRoot(startPath = process.cwd()) {
+      let currentPath = startPath;
+      for (let i = 0;i < 10; i++) {
+        if (existsSync(join(currentPath, ".git"))) {
+          return currentPath;
+        }
+        const parentPath = dirname(currentPath);
+        if (parentPath === currentPath) {
+          break;
+        }
+        currentPath = parentPath;
+      }
+      return null;
+    }
+    static resolveTemplatePath(templatePath) {
+      if (templatePath.startsWith("/")) {
+        return templatePath;
+      }
+      const repoRoot = this.findRepositoryRoot();
+      if (repoRoot) {
+        return join(repoRoot, templatePath);
+      }
+      return join(process.cwd(), templatePath);
+    }
+    static getDefaultTemplate() {
+      return `## Summary
+[Brief description of what this PR accomplishes]
+
+## Type of Change
+- [ ] Bug fix (non-breaking change which fixes an issue)
+- [ ] New feature (non-breaking change which adds functionality)
+- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
+- [ ] Documentation update
+- [ ] Configuration change
+- [ ] Test improvement
+- [ ] Code refactoring
+
+## Overview
+[A brief 1-3 sentence synopsis of the work]
+
+## Key Changes
+[Maximum 5 bullet points of the most important changes]
+- 
+- 
+- 
+
+## How has this been tested?
+- [ ] Unit tests pass
+- [ ] Manual testing completed
+- [ ] Edge cases considered
+
+## Breaking Changes
+[Only include if there are breaking changes]
+
+## Testing
+[Include if applicable, describe how the changes were tested, any new tests added, etc.]`;
+    }
+    static generatePromptWithTemplate(template, commitInfo, sourceBranch, targetBranch, options = {}) {
+      const contextSection = options.context ? `
+
+ADDITIONAL CONTEXT:
+${options.context}
+
+Consider this additional context when generating the PR description.` : "";
+      return `You are a senior software engineer reviewing code changes for a pull request.
+
+Based on the following git information, generate a pull request description using the provided template structure:
+
+TEMPLATE STRUCTURE TO FOLLOW:
+${template}
+
+BRANCH INFO:
+- Source branch: ${sourceBranch}
+- Target branch: ${targetBranch}
+
+GIT ANALYSIS:
+=== COMMIT MESSAGES ===
+${commitInfo.messages}
+
+=== FILE CHANGES SUMMARY ===
+${commitInfo.fileChanges}
+
+=== DIFF STATISTICS ===
+${commitInfo.diffStats}
+
+=== SAMPLE CODE CHANGES ===
+${commitInfo.codeSample}${contextSection}
+
+INSTRUCTIONS:
+- Follow the template structure exactly
+- Replace placeholder text with actual content based on the git analysis
+- Fill in checkboxes appropriately based on the changes
+- Keep the tone professional but concise
+- Focus on the business value and technical changes
+- Maximum 1000 words total
+- Do not use placeholder text like "[Description]" - write the actual content${options.noEmojis ? `
+- Do not use any emojis in the response` : ""}
+
+Generate the PR description now:`;
+    }
+    static validateTemplate(template) {
+      const issues = [];
+      if (!template || template.trim().length === 0) {
+        issues.push("Template is empty");
+      }
+      if (template.length > 1e4) {
+        issues.push("Template is too long (max 10,000 characters)");
+      }
+      const commonSections = ["summary", "overview", "changes"];
+      const hasSection = commonSections.some((section) => template.toLowerCase().includes(section));
+      if (!hasSection) {
+        issues.push("Template should include common sections like Summary, Overview, or Changes");
+      }
+      return {
+        valid: issues.length === 0,
+        issues
+      };
+    }
+  };
+});
+
 // index.ts
 import { writeFileSync } from "fs";
 
@@ -2953,7 +3140,18 @@ class OllamaClient {
     }
   }
   async generatePRMessage(model, commitInfo, sourceBranch, targetBranch, options = {}) {
-    const prompt = `You are a senior software engineer reviewing code changes for a pull request. 
+    let prompt;
+    if (options.template) {
+      const { TemplateLoader: TemplateLoader2 } = await Promise.resolve().then(() => (init_TemplateLoader(), exports_TemplateLoader));
+      prompt = TemplateLoader2.generatePromptWithTemplate(options.template, commitInfo, sourceBranch, targetBranch, { noEmojis: options.noEmojis, context: options.context });
+    } else {
+      const contextSection = options.context ? `
+
+ADDITIONAL CONTEXT:
+${options.context}
+
+Consider this additional context when generating the PR description.` : "";
+      prompt = `You are a senior software engineer reviewing code changes for a pull request. 
 
 Based on the following git information, generate a clear and professional pull request description:
 
@@ -2972,7 +3170,7 @@ ${commitInfo.fileChanges}
 ${commitInfo.diffStats}
 
 === SAMPLE CODE CHANGES ===
-${commitInfo.codeSample}
+${commitInfo.codeSample}${contextSection}
 
 Please generate a PR description with the following structure:
 
@@ -2994,6 +3192,7 @@ What this PR does and why it's needed.
 [Include if applicable, describe how the changes were tested, any new tests added, etc.]
 
 Keep the tone professional but concise. Focus on the business value and technical changes. Maximum 1000 words total. Do not use placeholder text like "[Title]" - write the actual content.${options.noEmojis ? " Do not use any emojis in the response." : ""}`;
+    }
     const response = await this.generate({
       model,
       prompt
@@ -3001,6 +3200,10 @@ Keep the tone professional but concise. Focus on the business value and technica
     return response.response;
   }
 }
+
+// src/utils/index.ts
+init_TemplateLoader();
+
 // index.ts
 class PRGenerator {
   gitAnalyzer;
@@ -3052,12 +3255,23 @@ class PRGenerator {
       return false;
     }
   }
-  async generatePRMessage(commitInfo, model, sourceBranch, targetBranch, noEmojis = false, showThinking = false, silent = false) {
+  async generatePRMessage(commitInfo, model, sourceBranch, targetBranch, noEmojis = false, showThinking = false, silent = false, templatePath, context) {
     if (!silent) {
       this.log.info(`Generating PR message using model: ${model}`);
     }
     try {
-      const response = await this.ollamaClient.generatePRMessage(model, commitInfo, sourceBranch, targetBranch, { noEmojis });
+      const template = TemplateLoader.loadTemplate({ templatePath });
+      if (!silent && templatePath) {
+        this.log.info(`Using custom template: ${templatePath}`);
+      } else if (!silent) {
+        const hasGitHubTemplate = TemplateLoader.loadTemplate({}) !== TemplateLoader.loadTemplate({ customTemplate: "dummy" });
+        if (hasGitHubTemplate) {
+          this.log.info("Using GitHub PR template");
+        } else {
+          this.log.info("Using default template");
+        }
+      }
+      const response = await this.ollamaClient.generatePRMessage(model, commitInfo, sourceBranch, targetBranch, { noEmojis, template, context });
       return OutputProcessor.processResponse(response, showThinking);
     } catch (error) {
       throw new Error(`Failed to generate PR message: ${error.message}`);
@@ -3091,7 +3305,9 @@ class PRGenerator {
       interactive = true,
       noEmojis = false,
       showThinking = false,
-      ci = false
+      ci = false,
+      templatePath,
+      context
     } = options;
     if (!this.isGitRepo()) {
       throw new Error("Not in a git repository");
@@ -3144,7 +3360,7 @@ class PRGenerator {
     if (!commitInfo.messages && !commitInfo.fileChanges) {
       throw new Error(`No commits found between ${finalTargetBranch} and ${finalSourceBranch}`);
     }
-    const prMessage = await this.generatePRMessage(commitInfo, model, finalSourceBranch, finalTargetBranch, noEmojis, showThinking, ci);
+    const prMessage = await this.generatePRMessage(commitInfo, model, finalSourceBranch, finalTargetBranch, noEmojis, showThinking, ci, templatePath, context);
     if (!prMessage) {
       throw new Error("Failed to generate PR message");
     }
@@ -3173,9 +3389,10 @@ ${source_default.blue.bold("=== GENERATED PR MESSAGE ===")}`);
   }
 }
 async function main() {
-  program.name("pr-generator").description("Generate PR messages using Ollama and git analysis").version("1.0.0").option("-s, --source <branch>", "Source branch with changes (default: current branch)").option("-t, --target <branch>", "Target branch (default: auto-detect main/master)").option("-m, --model <model>", "Ollama model name", "qwen3:latest").option("--ollama-host <url>", "Ollama host URL", "http://localhost:11434").option("--save", "Save PR message to file").option("--no-interactive", "Disable interactive prompts").option("--no-emojis", "Generate PR message without emojis").option("--show-thinking", "Show AI thinking process (useful for debugging)").option("--ci", "CI mode: output PR title and body as JSON for GitHub Actions").helpOption("-h, --help", "Display help for command");
+  program.name("pr-generator").description("Generate PR messages using Ollama and git analysis").version("1.0.0").argument("[context]", "Additional context to include in the AI prompt (e.g., ticket numbers, background info)").option("-s, --source <branch>", "Source branch with changes (default: current branch)").option("-t, --target <branch>", "Target branch (default: auto-detect main/master)").option("-m, --model <model>", "Ollama model name", "qwen3:latest").option("--ollama-host <url>", "Ollama host URL", "http://localhost:11434").option("--save", "Save PR message to file").option("--no-interactive", "Disable interactive prompts").option("--no-emojis", "Generate PR message without emojis").option("--show-thinking", "Show AI thinking process (useful for debugging)").option("--ci", "CI mode: output PR title and body as JSON for GitHub Actions").option("--template-path <path>", "Path to custom PR template file (default: auto-detect GitHub template)").helpOption("-h, --help", "Display help for command");
   program.parse();
   const options = program.opts();
+  const context = program.args[0];
   try {
     const generator = new PRGenerator(options.ollamaHost);
     await generator.run({
@@ -3186,7 +3403,9 @@ async function main() {
       interactive: options.interactive,
       noEmojis: !options.emojis,
       showThinking: options.showThinking,
-      ci: options.ci
+      ci: options.ci,
+      templatePath: options.templatePath,
+      context
     });
   } catch (error) {
     console.error(source_default.red("[ERROR]"), error.message);
