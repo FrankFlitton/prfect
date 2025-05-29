@@ -186,9 +186,7 @@ Consider this additional context when generating the PR description.`
 Based on the following git information, generate a pull request description using the provided template structure:
 
 TEMPLATE STRUCTURE TO FOLLOW:
-<pr_description_template>
 ${template}
-</pr_description_template>
 
 BRANCH INFO:
 - Source branch: ${sourceBranch}

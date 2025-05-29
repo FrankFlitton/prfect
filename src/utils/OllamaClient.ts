@@ -204,7 +204,6 @@ ${commitInfo.codeSample}${contextSection}
 
 Please generate a PR description with the following structure:
 
-<pr_description_template>
 # [Write a clear, direct title here - no placeholder text, just the actual title]
 
 ## Overview
@@ -221,7 +220,6 @@ What this PR does and why it's needed.
 
 ## Testing
 [Include if applicable, describe how the changes were tested, any new tests added, etc.]
-</pr_description_template>
 
 Keep the tone professional but concise. Focus on the business value and technical changes. Maximum 1000 words total. Do not use placeholder text like "[Title]" - write the actual content.${
         options.noEmojis ? " Do not use any emojis in the response." : ""
