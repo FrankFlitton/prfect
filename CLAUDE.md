@@ -43,11 +43,21 @@ The codebase has been refactored into a modular architecture with utility classe
 - Thinking tag detection and extraction capabilities
 - File validation and content formatting
 
+**TemplateLoader (`src/utils/TemplateLoader.ts`)**
+
+- Handles custom PR template loading and processing
+- Methods: `loadTemplate()`, `generatePromptWithTemplate()`, `validateTemplate()`
+- Smart detection priority system with multiple fallback paths
+- GitHub standard template auto-detection
+- Template validation and prompt generation integration
+- Mono-repo support with directory tree traversal
+
 ### Utility Exports (`src/utils/index.ts`)
 
 - Central export file for easy importing of all utilities
 - Provides TypeScript interfaces and type definitions
-- Enables clean imports: `import { GitAnalyzer, OutputProcessor, OllamaClient } from './src/utils'`
+- Enables clean imports: `import { GitAnalyzer, OutputProcessor, OllamaClient, TemplateLoader } from './src/utils'`
+- Exports TemplateConfig interface for template configuration
 
 ## Output Processing Pipeline
 
@@ -60,9 +70,33 @@ The codebase has been refactored into a modular architecture with utility classe
 
 Adding new options requires updates in 3 places:
 
-1. `program.option()` - CLI flag definition
+1. `program.option()` or `program.argument()` - CLI flag/argument definition
 2. `run()` method signature - TypeScript interface
 3. `generator.run()` call - Passing options through
+
+## Context Support
+
+Prfect supports adding custom context to the AI prompt for enhanced PR descriptions:
+
+### Usage Examples
+
+```bash
+# Add context about ticket numbers and background
+prfect "This was a big refactor that addressed Linear ticket BE-123. Follow up for BE-124 coming soon but non blocking" --no-emoji
+
+# Context with other options
+prfect "Fixes critical bug from user reports" --source feature/bugfix --target main --model qwen3:latest
+
+# Context in CI mode
+prfect "Implements OAuth integration per security requirements" --ci --source feature/oauth --target main
+```
+
+### Context Features
+
+- **Additional Information**: Provide ticket numbers, background context, or motivation
+- **Template Integration**: Context is automatically included in both custom templates and default prompts
+- **AI Enhancement**: Helps the LLM understand business context not visible in code changes
+- **Flexible Usage**: Works with all existing CLI options and modes
 
 ## CI Mode
 
@@ -103,6 +137,67 @@ prfect --ci --source feature/branch --target main --model qwen3:latest
     gh pr create --title "$TITLE" --body "$BODY"
 ```
 
+## Custom PR Templates
+
+Prfect supports custom PR templates to match your team's workflow and requirements.
+
+### Template Detection Priority
+
+1. **Explicit path**: `--template-path custom/template.md`
+2. **GitHub standard**: `.github/pull_request_template.md`
+3. **Alternative naming**: `.github/PULL_REQUEST_TEMPLATE.md`
+4. **Docs location**: `docs/pull_request_template.md`
+5. **Default built-in**: Fallback template
+
+### Usage
+
+```bash
+# Use custom template
+prfect --template-path .github/custom_template.md
+
+# Auto-detect GitHub template (default behavior)
+prfect
+
+# Specify source and target with template
+prfect --source feature/auth --target main --template-path team_template.md
+```
+
+### Template Features
+
+- **Mono-repo Support**: Searches up directory tree for templates
+- **Validation**: Checks template structure and content
+- **GitHub Integration**: Works seamlessly with GitHub Actions
+- **Fallback Handling**: Uses default if template not found
+
+### Template Structure
+
+Templates should include common sections like:
+- `## Summary` or `## Overview`
+- `## Type of Change` (with checkboxes)
+- `## Key Changes`
+- `## How has this been tested?`
+- `## Breaking Changes` (optional)
+
+Example template structure:
+```markdown
+## Summary
+[Brief description of changes]
+
+## Type of Change
+- [ ] Bug fix
+- [ ] New feature
+- [ ] Breaking change
+- [ ] Documentation update
+
+## Key Changes
+- 
+- 
+
+## How has this been tested?
+- [ ] Unit tests pass
+- [ ] Manual testing completed
+```
+
 ## Error Handling Patterns
 
 - **Git Errors**: GitAnalyzer wraps commands in try/catch with descriptive messages
@@ -129,6 +224,7 @@ prfect --ci --source feature/branch --target main --model qwen3:latest
 - `test/index.test.ts`: Tests OutputProcessor and GitAnalyzer utilities directly
 - `test/ollama.test.ts`: Tests OllamaClient with mocked fetch responses
 - `test/cli.test.ts`: Tests CLI option parsing and validation
+- `test/template.test.ts`: Tests TemplateLoader functionality and template processing
 
 ### Testing Requirements
 
@@ -203,15 +299,19 @@ prfect --ci --source feature/branch --target main --model qwen3:latest
 ```
 prfect/
 ├── index.ts                 # Main PRGenerator class
+├── .github/
+│   └── pull_request_template.md  # Sample GitHub PR template
 ├── src/utils/
 │   ├── index.ts            # Utility exports
 │   ├── GitAnalyzer.ts      # Git operations
 │   ├── OllamaClient.ts     # AI communication
-│   └── OutputProcessor.ts  # Response processing
+│   ├── OutputProcessor.ts  # Response processing
+│   └── TemplateLoader.ts   # Custom template handling
 ├── test/
 │   ├── index.test.ts       # Core utility tests (Bun test runner)
 │   ├── ollama.test.ts      # API communication tests (Bun test runner)
-│   └── cli.test.ts         # CLI option tests (Bun test runner)
+│   ├── cli.test.ts         # CLI option tests (Bun test runner)
+│   └── template.test.ts    # Template functionality tests (Bun test runner)
 ├── package.json             # Includes bun test scripts
 └── CLAUDE.md               # This documentation
 ```

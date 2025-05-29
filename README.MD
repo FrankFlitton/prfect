@@ -19,6 +19,77 @@ Prfect is a powerful tool that analyzes your git commits and generates professio
 - 💾 **Export Options**: Save to markdown files
 - 🌐 **Flexible**: Works with any git branching strategy
 
+## 🎯 Quick Start
+
+### Prerequisites
+
+1. **Install Ollama**:
+
+```bash
+curl -fsSL https://ollama.ai/install.sh | sh
+ollama serve
+ollama pull qwen3:latest
+```
+
+2. **Ensure you're in a git repository**
+
+### Installation & Usage
+
+Choose your preferred version:
+
+#### 🟢 Node.js/TypeScript
+
+```bash
+# Install globally
+npm install -g prfect
+
+# Or run directly with npx
+npx prfect
+
+# Basic usage
+prfect
+
+# With options
+prfect --source feature/auth --target main --save
+```
+
+## 🎯 Context Support
+
+Enhance your PR descriptions by providing additional context that may not be visible in the code changes. Perfect for adding ticket numbers, business context, or background information.
+
+### Usage
+
+```bash
+# Basic context
+prfect "This was a big refactor that addressed Linear ticket BE-123"
+
+# Context with background info
+prfect "Fixes critical bug from user reports. Addresses performance issues in checkout flow"
+
+# Context with follow-up information
+prfect "Implements OAuth integration per security requirements. Follow up for MFA coming in BE-124"
+
+# Context in CI mode
+prfect "Emergency hotfix for production issue" --ci --source hotfix/payment-bug --target main
+```
+
+### What Context Helps With
+
+- **📋 Ticket References**: Link to Linear, Jira, or other project management tools
+- **💼 Business Context**: Explain the business reason or user impact
+- **🔗 Dependencies**: Note related work or follow-up tasks
+- **⚠️ Urgency**: Indicate if this is a hotfix or time-sensitive change
+- **📊 Performance**: Provide benchmarks or performance context
+- **🔒 Security**: Add security considerations or compliance notes
+
+### Context Integration
+
+The context is automatically incorporated into:
+- **Default prompts**: Added as "ADDITIONAL CONTEXT" section
+- **Custom templates**: Seamlessly integrated into template-based generation
+- **CI mode**: Included in automated PR generation
+- **All AI models**: Works with any Ollama-compatible model
+
 ## 📝 Custom PR Templates
 
 Prfect supports custom PR templates to match your team's workflow and requirements. It automatically detects and uses GitHub standard templates or allows you to specify custom ones.
@@ -125,77 +196,6 @@ Create `.github/pull_request_template.md`:
 ```
 
 Prfect will automatically detect and use this template for all PRs in your repository!
-
-## 🎯 Context Support
-
-Enhance your PR descriptions by providing additional context that may not be visible in the code changes. Perfect for adding ticket numbers, business context, or background information.
-
-### Usage
-
-```bash
-# Basic context
-prfect "This was a big refactor that addressed Linear ticket BE-123"
-
-# Context with background info
-prfect "Fixes critical bug from user reports. Addresses performance issues in checkout flow"
-
-# Context with follow-up information
-prfect "Implements OAuth integration per security requirements. Follow up for MFA coming in BE-124"
-
-# Context in CI mode
-prfect "Emergency hotfix for production issue" --ci --source hotfix/payment-bug --target main
-```
-
-### What Context Helps With
-
-- **📋 Ticket References**: Link to Linear, Jira, or other project management tools
-- **💼 Business Context**: Explain the business reason or user impact
-- **🔗 Dependencies**: Note related work or follow-up tasks
-- **⚠️ Urgency**: Indicate if this is a hotfix or time-sensitive change
-- **📊 Performance**: Provide benchmarks or performance context
-- **🔒 Security**: Add security considerations or compliance notes
-
-### Context Integration
-
-The context is automatically incorporated into:
-- **Default prompts**: Added as "ADDITIONAL CONTEXT" section
-- **Custom templates**: Seamlessly integrated into template-based generation
-- **CI mode**: Included in automated PR generation
-- **All AI models**: Works with any Ollama-compatible model
-
-## 🎯 Quick Start
-
-### Prerequisites
-
-1. **Install Ollama**:
-
-```bash
-curl -fsSL https://ollama.ai/install.sh | sh
-ollama serve
-ollama pull qwen3:latest
-```
-
-2. **Ensure you're in a git repository**
-
-### Installation & Usage
-
-Choose your preferred version:
-
-#### 🟢 Node.js/TypeScript
-
-```bash
-# Install globally
-npm install -g prfect
-
-# Or run directly with npx
-npx prfect
-
-# Basic usage
-prfect
-
-# With options
-prfect --source feature/auth --target main --save
-```
 
 ## 📋 Usage Examples
 
