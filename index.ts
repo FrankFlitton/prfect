@@ -296,7 +296,7 @@ async function main() {
   program
     .name("pr-generator")
     .description("Generate PR messages using Ollama and git analysis")
-    .version("1.0.0")
+    .version("__VERSION__")
     .argument(
       "[context]",
       "Additional context to include in the AI prompt (e.g., ticket numbers, background info)"
