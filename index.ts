@@ -9,7 +9,7 @@ import { writeFileSync } from "fs";
 import { program } from "commander";
 import chalk from "chalk";
 import readline from "readline";
-import { GitAnalyzer, OutputProcessor, OllamaClient, type CommitInfo } from "./src/utils";
+import { GitAnalyzer, OutputProcessor, OllamaClient, TemplateLoader, type CommitInfo, type TemplateConfig } from "./src/utils";
 
 class PRGenerator {
   private gitAnalyzer: GitAnalyzer;
@@ -82,19 +82,33 @@ class PRGenerator {
     targetBranch: string,
     noEmojis = false,
     showThinking = false,
-    silent = false
+    silent = false,
+    templatePath?: string
   ): Promise<string> {
     if (!silent) {
       this.log.info(`Generating PR message using model: ${model}`);
     }
 
     try {
+      // Load template
+      const template = TemplateLoader.loadTemplate({ templatePath });
+      if (!silent && templatePath) {
+        this.log.info(`Using custom template: ${templatePath}`);
+      } else if (!silent) {
+        const hasGitHubTemplate = TemplateLoader.loadTemplate({}) !== TemplateLoader.loadTemplate({ customTemplate: "dummy" });
+        if (hasGitHubTemplate) {
+          this.log.info("Using GitHub PR template");
+        } else {
+          this.log.info("Using default template");
+        }
+      }
+
       const response = await this.ollamaClient.generatePRMessage(
         model,
         commitInfo,
         sourceBranch,
         targetBranch,
-        { noEmojis }
+        { noEmojis, template }
       );
 
       return OutputProcessor.processResponse(response, showThinking);
@@ -136,6 +150,7 @@ class PRGenerator {
       noEmojis?: boolean;
       showThinking?: boolean;
       ci?: boolean;
+      templatePath?: string;
     } = {}
   ): Promise<string> {
     const {
@@ -147,6 +162,7 @@ class PRGenerator {
       noEmojis = false,
       showThinking = false,
       ci = false,
+      templatePath,
     } = options;
 
     // Check if in git repo
@@ -231,7 +247,8 @@ class PRGenerator {
       finalTargetBranch,
       noEmojis,
       showThinking,
-      ci
+      ci,
+      templatePath
     );
 
     if (!prMessage) {
@@ -297,6 +314,10 @@ async function main() {
       "--ci",
       "CI mode: output PR title and body as JSON for GitHub Actions"
     )
+    .option(
+      "--template-path <path>",
+      "Path to custom PR template file (default: auto-detect GitHub template)"
+    )
     .helpOption("-h, --help", "Display help for command");
 
   program.parse();
@@ -314,6 +335,7 @@ async function main() {
       noEmojis: !options.emojis, // Convert emojis flag to noEmojis
       showThinking: options.showThinking,
       ci: options.ci,
+      templatePath: options.templatePath,
     });
   } catch (error: any) {
     console.error(chalk.red("[ERROR]"), error.message);

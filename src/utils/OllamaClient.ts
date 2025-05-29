@@ -41,7 +41,7 @@ export class OllamaClient {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as { models?: OllamaModel[] };
       return Array.isArray(data?.models) ? data.models : [];
     } catch (error: any) {
       if (error.name === "TimeoutError") {
@@ -57,7 +57,7 @@ export class OllamaClient {
   public async isModelAvailable(modelName: string): Promise<boolean> {
     try {
       const models = await this.getAvailableModels();
-      return models.some(model => model.name === modelName);
+      return models.some((model) => model.name === modelName);
     } catch {
       return false;
     }
@@ -66,7 +66,9 @@ export class OllamaClient {
   /**
    * Generate text using Ollama
    */
-  public async generate(request: OllamaGenerateRequest): Promise<OllamaResponse> {
+  public async generate(
+    request: OllamaGenerateRequest
+  ): Promise<OllamaResponse> {
     try {
       const response = await fetch(`${this.host}/api/generate`, {
         method: "POST",
@@ -91,7 +93,7 @@ export class OllamaClient {
       }
 
       const result = (await response.json()) as OllamaResponse;
-      
+
       if (!result.response) {
         throw new Error("No response field in Ollama output");
       }
@@ -99,7 +101,9 @@ export class OllamaClient {
       return result;
     } catch (error: any) {
       if (error.name === "TimeoutError") {
-        throw new Error("Request timed out. The model might be taking too long to respond.");
+        throw new Error(
+          "Request timed out. The model might be taking too long to respond."
+        );
       }
       throw new Error(`Failed to generate response: ${error.message}`);
     }
@@ -137,7 +141,7 @@ export class OllamaClient {
   public static validateHost(host: string): boolean {
     try {
       const url = new URL(host);
-      return url.protocol === 'http:' || url.protocol === 'https:';
+      return url.protocol === "http:" || url.protocol === "https:";
     } catch {
       return false;
     }
@@ -151,9 +155,24 @@ export class OllamaClient {
     commitInfo: any,
     sourceBranch: string,
     targetBranch: string,
-    options: { noEmojis?: boolean } = {}
+    options: { noEmojis?: boolean; template?: string } = {}
   ): Promise<string> {
-    const prompt = `You are a senior software engineer reviewing code changes for a pull request. 
+    // Use custom template if provided, otherwise use default structure
+    let prompt: string;
+
+    if (options.template) {
+      // Import TemplateLoader to use generatePromptWithTemplate
+      const { TemplateLoader } = await import("./TemplateLoader");
+      prompt = TemplateLoader.generatePromptWithTemplate(
+        options.template,
+        commitInfo,
+        sourceBranch,
+        targetBranch,
+        { noEmojis: options.noEmojis }
+      );
+    } else {
+      // Use default prompt structure
+      prompt = `You are a senior software engineer reviewing code changes for a pull request. 
 
 Based on the following git information, generate a clear and professional pull request description:
 
@@ -193,7 +212,10 @@ What this PR does and why it's needed.
 ## Testing
 [Include if applicable, describe how the changes were tested, any new tests added, etc.]
 
-Keep the tone professional but concise. Focus on the business value and technical changes. Maximum 1000 words total. Do not use placeholder text like "[Title]" - write the actual content.${options.noEmojis ? ' Do not use any emojis in the response.' : ''}`;
+Keep the tone professional but concise. Focus on the business value and technical changes. Maximum 1000 words total. Do not use placeholder text like "[Title]" - write the actual content.${
+        options.noEmojis ? " Do not use any emojis in the response." : ""
+      }`;
+    }
 
     const response = await this.generate({
       model,
