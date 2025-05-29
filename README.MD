@@ -14,6 +14,7 @@ Prfect is a powerful tool that analyzes your git commits and generates professio
 - 🌲 **Branch Intelligence**: Auto-detects main/master/develop branches
 - 📝 **Professional Output**: Generates structured, readable PR descriptions
 - 📋 **Custom Templates**: Supports GitHub PR templates and custom formats
+- 🎯 **Context Support**: Add custom context and background information to AI prompts
 - 🎨 **Beautiful CLI**: Colored output with progress indicators
 - 💾 **Export Options**: Save to markdown files
 - 🌐 **Flexible**: Works with any git branching strategy
@@ -125,6 +126,43 @@ Create `.github/pull_request_template.md`:
 
 Prfect will automatically detect and use this template for all PRs in your repository!
 
+## 🎯 Context Support
+
+Enhance your PR descriptions by providing additional context that may not be visible in the code changes. Perfect for adding ticket numbers, business context, or background information.
+
+### Usage
+
+```bash
+# Basic context
+prfect "This was a big refactor that addressed Linear ticket BE-123"
+
+# Context with background info
+prfect "Fixes critical bug from user reports. Addresses performance issues in checkout flow"
+
+# Context with follow-up information
+prfect "Implements OAuth integration per security requirements. Follow up for MFA coming in BE-124"
+
+# Context in CI mode
+prfect "Emergency hotfix for production issue" --ci --source hotfix/payment-bug --target main
+```
+
+### What Context Helps With
+
+- **📋 Ticket References**: Link to Linear, Jira, or other project management tools
+- **💼 Business Context**: Explain the business reason or user impact
+- **🔗 Dependencies**: Note related work or follow-up tasks
+- **⚠️ Urgency**: Indicate if this is a hotfix or time-sensitive change
+- **📊 Performance**: Provide benchmarks or performance context
+- **🔒 Security**: Add security considerations or compliance notes
+
+### Context Integration
+
+The context is automatically incorporated into:
+- **Default prompts**: Added as "ADDITIONAL CONTEXT" section
+- **Custom templates**: Seamlessly integrated into template-based generation
+- **CI mode**: Included in automated PR generation
+- **All AI models**: Works with any Ollama-compatible model
+
 ## 🎯 Quick Start
 
 ### Prerequisites
@@ -190,6 +228,12 @@ prfect --show-thinking
 
 # Use custom PR template
 prfect --template-path .github/custom_template.md
+
+# Add context information to the AI prompt
+prfect "This was a big refactor that addressed Linear ticket BE-123. Follow up for BE-124 coming soon but non blocking"
+
+# Context with other options
+prfect "Fixes critical bug from user reports" --source feature/bugfix --target main --model qwen3:latest
 ```
 
 ### Programmatic Usage (Node.js/TypeScript)
@@ -208,6 +252,7 @@ const prMessage = await generator.run({
   noEmojis: true,
   showThinking: false,
   templatePath: ".github/custom_template.md",
+  context: "This addresses Linear ticket BE-123",
 });
 
 console.log(prMessage);
