@@ -9,9 +9,9 @@ export interface TemplateConfig {
 export class TemplateLoader {
   private static readonly DEFAULT_TEMPLATE_PATHS = [
     ".github/pull_request_template.md",
-    ".github/PULL_REQUEST_TEMPLATE.md", 
+    ".github/PULL_REQUEST_TEMPLATE.md",
     "docs/pull_request_template.md",
-    ".github/PULL_REQUEST_TEMPLATE/pull_request_template.md"
+    ".github/PULL_REQUEST_TEMPLATE/pull_request_template.md",
   ];
 
   /**
@@ -52,7 +52,9 @@ export class TemplateLoader {
       }
       return readFileSync(absolutePath, "utf8");
     } catch (error: any) {
-      throw new Error(`Failed to load template from ${templatePath}: ${error.message}`);
+      throw new Error(
+        `Failed to load template from ${templatePath}: ${error.message}`
+      );
     }
   }
 
@@ -81,15 +83,18 @@ export class TemplateLoader {
   /**
    * Find repository root by looking for .git directory
    */
-  private static findRepositoryRoot(startPath: string = process.cwd()): string | null {
+  private static findRepositoryRoot(
+    startPath: string = process.cwd()
+  ): string | null {
     let currentPath = startPath;
-    
+
     // Traverse up the directory tree
-    for (let i = 0; i < 10; i++) { // Limit to prevent infinite loops
+    for (let i = 0; i < 10; i++) {
+      // Limit to prevent infinite loops
       if (existsSync(join(currentPath, ".git"))) {
         return currentPath;
       }
-      
+
       const parentPath = dirname(currentPath);
       if (parentPath === currentPath) {
         // Reached filesystem root
@@ -97,7 +102,7 @@ export class TemplateLoader {
       }
       currentPath = parentPath;
     }
-    
+
     return null;
   }
 
@@ -165,8 +170,17 @@ export class TemplateLoader {
     commitInfo: any,
     sourceBranch: string,
     targetBranch: string,
-    options: { noEmojis?: boolean } = {}
+    options: { noEmojis?: boolean; context?: string } = {}
   ): string {
+    const contextSection = options.context
+      ? `
+
+ADDITIONAL CONTEXT:
+${options.context}
+
+Consider this additional context when generating the PR description.`
+      : "";
+
     return `You are a senior software engineer reviewing code changes for a pull request.
 
 Based on the following git information, generate a pull request description using the provided template structure:
@@ -189,7 +203,7 @@ ${commitInfo.fileChanges}
 ${commitInfo.diffStats}
 
 === SAMPLE CODE CHANGES ===
-${commitInfo.codeSample}
+${commitInfo.codeSample}${contextSection}
 
 INSTRUCTIONS:
 - Follow the template structure exactly
@@ -198,7 +212,9 @@ INSTRUCTIONS:
 - Keep the tone professional but concise
 - Focus on the business value and technical changes
 - Maximum 1000 words total
-- Do not use placeholder text like "[Description]" - write the actual content${options.noEmojis ? '\n- Do not use any emojis in the response' : ''}
+- Do not use placeholder text like "[Description]" - write the actual content${
+      options.noEmojis ? "\n- Do not use any emojis in the response" : ""
+    }
 
 Generate the PR description now:`;
   }
@@ -206,9 +222,12 @@ Generate the PR description now:`;
   /**
    * Validate template content
    */
-  public static validateTemplate(template: string): { valid: boolean; issues: string[] } {
+  public static validateTemplate(template: string): {
+    valid: boolean;
+    issues: string[];
+  } {
     const issues: string[] = [];
-    
+
     if (!template || template.trim().length === 0) {
       issues.push("Template is empty");
     }
@@ -219,17 +238,19 @@ Generate the PR description now:`;
 
     // Check for common template sections
     const commonSections = ["summary", "overview", "changes"];
-    const hasSection = commonSections.some(section => 
+    const hasSection = commonSections.some((section) =>
       template.toLowerCase().includes(section)
     );
-    
+
     if (!hasSection) {
-      issues.push("Template should include common sections like Summary, Overview, or Changes");
+      issues.push(
+        "Template should include common sections like Summary, Overview, or Changes"
+      );
     }
 
     return {
       valid: issues.length === 0,
-      issues
+      issues,
     };
   }
 }

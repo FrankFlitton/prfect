@@ -83,7 +83,8 @@ class PRGenerator {
     noEmojis = false,
     showThinking = false,
     silent = false,
-    templatePath?: string
+    templatePath?: string,
+    context?: string
   ): Promise<string> {
     if (!silent) {
       this.log.info(`Generating PR message using model: ${model}`);
@@ -108,7 +109,7 @@ class PRGenerator {
         commitInfo,
         sourceBranch,
         targetBranch,
-        { noEmojis, template }
+        { noEmojis, template, context }
       );
 
       return OutputProcessor.processResponse(response, showThinking);
@@ -151,6 +152,7 @@ class PRGenerator {
       showThinking?: boolean;
       ci?: boolean;
       templatePath?: string;
+      context?: string;
     } = {}
   ): Promise<string> {
     const {
@@ -163,6 +165,7 @@ class PRGenerator {
       showThinking = false,
       ci = false,
       templatePath,
+      context,
     } = options;
 
     // Check if in git repo
@@ -248,7 +251,8 @@ class PRGenerator {
       noEmojis,
       showThinking,
       ci,
-      templatePath
+      templatePath,
+      context
     );
 
     if (!prMessage) {
@@ -293,6 +297,10 @@ async function main() {
     .name("pr-generator")
     .description("Generate PR messages using Ollama and git analysis")
     .version("1.0.0")
+    .argument(
+      "[context]",
+      "Additional context to include in the AI prompt (e.g., ticket numbers, background info)"
+    )
     .option(
       "-s, --source <branch>",
       "Source branch with changes (default: current branch)"
@@ -323,6 +331,7 @@ async function main() {
   program.parse();
 
   const options = program.opts();
+  const context = program.args[0]; // Get the context argument
 
   try {
     const generator = new PRGenerator(options.ollamaHost);
@@ -336,6 +345,7 @@ async function main() {
       showThinking: options.showThinking,
       ci: options.ci,
       templatePath: options.templatePath,
+      context,
     });
   } catch (error: any) {
     console.error(chalk.red("[ERROR]"), error.message);

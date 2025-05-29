@@ -17,6 +17,10 @@ describe("CLI Options", () => {
         .name("pr-generator")
         .description("Generate PR messages using Ollama and git analysis")
         .version("1.0.0")
+        .argument(
+          "[context]",
+          "Additional context to include in the AI prompt (e.g., ticket numbers, background info)"
+        )
         .option(
           "-s, --source <branch>",
           "Source branch with changes (default: current branch)"
@@ -260,6 +264,7 @@ describe("CLI Options", () => {
         templatePath: "custom/template.md",
         ollamaHost: "http://localhost:11434",
       };
+      const context = "This addresses Linear ticket BE-123";
 
       const runOptions = {
         source: cliOptions.source,
@@ -271,6 +276,7 @@ describe("CLI Options", () => {
         showThinking: cliOptions.showThinking,
         ci: cliOptions.ci,
         templatePath: cliOptions.templatePath,
+        context,
       };
 
       expect(runOptions.source).toBe("feature/test");
@@ -282,6 +288,7 @@ describe("CLI Options", () => {
       expect(runOptions.showThinking).toBe(false);
       expect(runOptions.ci).toBe(false);
       expect(runOptions.templatePath).toBe("custom/template.md");
+      expect(runOptions.context).toBe("This addresses Linear ticket BE-123");
     });
   });
 
@@ -340,6 +347,61 @@ describe("CLI Options", () => {
       expect(typeof mockOutput.body).toBe("string");
       expect(typeof mockOutput.source_branch).toBe("string");
       expect(typeof mockOutput.target_branch).toBe("string");
+    });
+  });
+
+  describe("Context argument", () => {
+    test("should handle context argument parsing", () => {
+      const testProgram = program
+        .argument("[context]", "Additional context for AI prompt")
+        .option("-s, --source <branch>", "Source branch");
+
+      testProgram.parse([
+        "node", 
+        "prfect", 
+        "This addresses Linear ticket BE-123", 
+        "--source", 
+        "feature/test"
+      ]);
+
+      const context = testProgram.args[0];
+      const opts = testProgram.opts();
+
+      expect(context).toBe("This addresses Linear ticket BE-123");
+      expect(opts.source).toBe("feature/test");
+    });
+
+    test("should handle missing context argument", () => {
+      const testProgram = program
+        .argument("[context]", "Additional context for AI prompt")
+        .option("-s, --source <branch>", "Source branch");
+
+      testProgram.parse([
+        "node", 
+        "prfect", 
+        "--source", 
+        "feature/test"
+      ]);
+
+      const context = testProgram.args[0];
+      const opts = testProgram.opts();
+
+      expect(context).toBeUndefined();
+      expect(opts.source).toBe("feature/test");
+    });
+
+    test("should handle context with spaces and special characters", () => {
+      const testProgram = program
+        .argument("[context]", "Additional context for AI prompt");
+
+      testProgram.parse([
+        "node", 
+        "prfect", 
+        "Big refactor for Linear BE-123. Follow up BE-124 coming soon but non-blocking"
+      ]);
+
+      const context = testProgram.args[0];
+      expect(context).toBe("Big refactor for Linear BE-123. Follow up BE-124 coming soon but non-blocking");
     });
   });
 });

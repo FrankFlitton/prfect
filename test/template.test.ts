@@ -83,6 +83,38 @@ describe("TemplateLoader", () => {
       expect(promptWithEmojis).not.toContain("Do not use any emojis");
       expect(promptWithoutEmojis).toContain("Do not use any emojis");
     });
+
+    test("should include context when provided", () => {
+      const template = "## Summary\n[Description]";
+      const commitInfo = {
+        messages: "test commit",
+        fileChanges: "test.ts",
+        diffStats: "+1 -0", 
+        codeSample: "test code"
+      };
+      const context = "This addresses Linear ticket BE-123. Follow up for BE-124 coming soon but non blocking";
+
+      const promptWithContext = TemplateLoader.generatePromptWithTemplate(
+        template,
+        commitInfo,
+        "test",
+        "main",
+        { context }
+      );
+
+      const promptWithoutContext = TemplateLoader.generatePromptWithTemplate(
+        template,
+        commitInfo,
+        "test",
+        "main",
+        {}
+      );
+
+      expect(promptWithContext).toContain("ADDITIONAL CONTEXT:");
+      expect(promptWithContext).toContain(context);
+      expect(promptWithContext).toContain("Consider this additional context when generating the PR description");
+      expect(promptWithoutContext).not.toContain("ADDITIONAL CONTEXT:");
+    });
   });
 
   describe("validateTemplate", () => {
