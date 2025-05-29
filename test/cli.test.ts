@@ -41,6 +41,10 @@ describe("CLI Options", () => {
         .option(
           "--ci",
           "CI mode: output PR title and body as JSON for GitHub Actions"
+        )
+        .option(
+          "--template-path <path>",
+          "Path to custom PR template file (default: auto-detect GitHub template)"
         );
 
       const options = testProgram.options.map((opt) => opt.flags);
@@ -54,6 +58,7 @@ describe("CLI Options", () => {
       expect(options).toContain("--no-emojis");
       expect(options).toContain("--show-thinking");
       expect(options).toContain("--ci");
+      expect(options).toContain("--template-path <path>");
     });
 
     test("should have correct default values", () => {
@@ -152,6 +157,23 @@ describe("CLI Options", () => {
       const opts = testProgram.opts();
       expect(opts.ollamaHost).toBe("http://192.168.1.100:11434");
     });
+
+    test("should parse template path option", () => {
+      const testProgram = program.option(
+        "--template-path <path>",
+        "Path to custom PR template file"
+      );
+
+      testProgram.parse([
+        "node",
+        "prfect", 
+        "--template-path",
+        "custom/pr_template.md"
+      ]);
+
+      const opts = testProgram.opts();
+      expect(opts.templatePath).toBe("custom/pr_template.md");
+    });
   });
 
   describe("Option combinations", () => {
@@ -235,6 +257,7 @@ describe("CLI Options", () => {
         emojis: false,
         showThinking: false,
         ci: false,
+        templatePath: "custom/template.md",
         ollamaHost: "http://localhost:11434",
       };
 
@@ -247,6 +270,7 @@ describe("CLI Options", () => {
         noEmojis: !cliOptions.emojis, // Convert emojis flag to noEmojis
         showThinking: cliOptions.showThinking,
         ci: cliOptions.ci,
+        templatePath: cliOptions.templatePath,
       };
 
       expect(runOptions.source).toBe("feature/test");
@@ -257,6 +281,7 @@ describe("CLI Options", () => {
       expect(runOptions.noEmojis).toBe(true); // !false = true
       expect(runOptions.showThinking).toBe(false);
       expect(runOptions.ci).toBe(false);
+      expect(runOptions.templatePath).toBe("custom/template.md");
     });
   });
 

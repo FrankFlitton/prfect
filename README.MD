@@ -13,9 +13,117 @@ Prfect is a powerful tool that analyzes your git commits and generates professio
 - 🔍 **Smart Git Analysis**: Analyzes commits, file changes, and code diffs
 - 🌲 **Branch Intelligence**: Auto-detects main/master/develop branches
 - 📝 **Professional Output**: Generates structured, readable PR descriptions
+- 📋 **Custom Templates**: Supports GitHub PR templates and custom formats
 - 🎨 **Beautiful CLI**: Colored output with progress indicators
 - 💾 **Export Options**: Save to markdown files
 - 🌐 **Flexible**: Works with any git branching strategy
+
+## 📝 Custom PR Templates
+
+Prfect supports custom PR templates to match your team's workflow and requirements. It automatically detects and uses GitHub standard templates or allows you to specify custom ones.
+
+### Template Detection Priority
+
+1. **Explicit path**: `--template-path custom/template.md`
+2. **GitHub standard**: `.github/pull_request_template.md`
+3. **Alternative naming**: `.github/PULL_REQUEST_TEMPLATE.md`
+4. **Docs location**: `docs/pull_request_template.md`
+5. **Default built-in**: Fallback template
+
+### Usage
+
+```bash
+# Use custom template
+prfect --template-path .github/custom_template.md
+
+# Auto-detect GitHub template (default behavior)
+prfect
+
+# Specify source and target with template
+prfect --source feature/auth --target main --template-path team_template.md
+
+# CI mode with custom template
+prfect --ci --template-path templates/ci_template.md
+```
+
+### Template Structure
+
+Templates should include common sections that Prfect will intelligently fill:
+
+```markdown
+## Summary
+[Brief description of changes]
+
+## Type of Change
+- [ ] Bug fix (non-breaking change which fixes an issue)
+- [ ] New feature (non-breaking change which adds functionality)
+- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
+- [ ] Documentation update
+
+## Key Changes
+- 
+- 
+- 
+
+## How has this been tested?
+- [ ] Unit tests pass
+- [ ] Manual testing completed
+- [ ] Edge cases considered
+
+## Breaking Changes
+[Only include if there are breaking changes]
+
+## Additional Notes
+[Any additional information for reviewers]
+```
+
+### Template Features
+
+- **🏢 Mono-repo Support**: Searches up directory tree for templates
+- **✅ Validation**: Checks template structure and content quality
+- **🔗 GitHub Integration**: Works seamlessly with GitHub's PR template system
+- **🔄 Fallback Handling**: Uses default template if custom one not found
+- **🎯 Smart Parsing**: AI understands your template structure and fills it appropriately
+
+### Example: Team-Specific Template
+
+Create `.github/pull_request_template.md`:
+
+```markdown
+## Summary
+[What does this PR accomplish?]
+
+## Business Impact
+[How does this benefit users/business?]
+
+## Technical Details
+[Implementation approach and key technical decisions]
+
+## Security Considerations
+- [ ] No sensitive data exposed
+- [ ] Authentication/authorization reviewed
+- [ ] Input validation implemented
+
+## Performance Impact
+- [ ] No performance degradation
+- [ ] Load testing completed (if applicable)
+
+## Testing Strategy
+- [ ] Unit tests added/updated
+- [ ] Integration tests pass
+- [ ] Manual testing completed
+- [ ] Accessibility tested (if UI changes)
+
+## Deployment Notes
+[Any special deployment considerations]
+
+## Documentation
+- [ ] README updated (if needed)
+- [ ] API docs updated (if needed)
+- [ ] Internal docs updated (if needed)
+```
+
+Prfect will automatically detect and use this template for all PRs in your repository!
 
 ## 🎯 Quick Start
 
@@ -79,6 +187,9 @@ prfect --no-emojis
 
 # Show AI thinking process (useful for debugging)
 prfect --show-thinking
+
+# Use custom PR template
+prfect --template-path .github/custom_template.md
 ```
 
 ### Programmatic Usage (Node.js/TypeScript)
@@ -96,6 +207,7 @@ const prMessage = await generator.run({
   interactive: false,
   noEmojis: true,
   showThinking: false,
+  templatePath: ".github/custom_template.md",
 });
 
 console.log(prMessage);
@@ -109,7 +221,8 @@ console.log(prMessage);
     "pr": "prfect",
     "pr:save": "prfect --save --no-interactive",
     "pr:clean": "prfect --no-emojis --save",
-    "pr:debug": "prfect --show-thinking"
+    "pr:debug": "prfect --show-thinking",
+    "pr:custom": "prfect --template-path .github/custom_template.md"
   }
 }
 ```
