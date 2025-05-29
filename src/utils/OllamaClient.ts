@@ -155,7 +155,7 @@ export class OllamaClient {
     commitInfo: any,
     sourceBranch: string,
     targetBranch: string,
-    options: { noEmojis?: boolean; template?: string } = {}
+    options: { noEmojis?: boolean; template?: string; context?: string } = {}
   ): Promise<string> {
     // Use custom template if provided, otherwise use default structure
     let prompt: string;
@@ -168,10 +168,19 @@ export class OllamaClient {
         commitInfo,
         sourceBranch,
         targetBranch,
-        { noEmojis: options.noEmojis }
+        { noEmojis: options.noEmojis, context: options.context }
       );
     } else {
       // Use default prompt structure
+      const contextSection = options.context
+        ? `
+
+ADDITIONAL CONTEXT:
+${options.context}
+
+Consider this additional context when generating the PR description.`
+        : "";
+
       prompt = `You are a senior software engineer reviewing code changes for a pull request. 
 
 Based on the following git information, generate a clear and professional pull request description:
@@ -191,10 +200,11 @@ ${commitInfo.fileChanges}
 ${commitInfo.diffStats}
 
 === SAMPLE CODE CHANGES ===
-${commitInfo.codeSample}
+${commitInfo.codeSample}${contextSection}
 
 Please generate a PR description with the following structure:
 
+<pr_description_template>
 # [Write a clear, direct title here - no placeholder text, just the actual title]
 
 ## Overview
@@ -211,6 +221,7 @@ What this PR does and why it's needed.
 
 ## Testing
 [Include if applicable, describe how the changes were tested, any new tests added, etc.]
+</pr_description_template>
 
 Keep the tone professional but concise. Focus on the business value and technical changes. Maximum 1000 words total. Do not use placeholder text like "[Title]" - write the actual content.${
         options.noEmojis ? " Do not use any emojis in the response." : ""
